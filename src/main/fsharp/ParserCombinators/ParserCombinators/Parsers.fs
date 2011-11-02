@@ -32,7 +32,7 @@ let inline (|||) (l:Parser<'a>)(r:Parser<'a>) = {
             | Success (ar, rest) -> Success (ar, rest)
             | Failure (rightMessage) -> Failure (leftMessage + " and " + rightMessage)
 }
-let andThen(l:Parser<'a>, r:Lazy<Parser<'b>>) = {
+let andThen(l:Parser<'a>,r:Lazy<Parser<'b>>) = {
     new Parser<'a * 'b> with member this.Parse(s) = match l.Parse(s) with
         | Success (al, rest) -> match r.Force().Parse(rest) with
             | Success (ar, rest) -> Success ((al, ar), rest)
@@ -85,7 +85,6 @@ let letter = (oneOfChars ['a'..'z']) ||| (oneOfChars ['a'..'z'])
 let underscore = matchChar '_'
 let idBody = zeroOrMore(oneOf([letter; digit; underscore]))
 let id = letter ++ idBody ^^ (fun (x, xs) -> x :: xs |> charListToString)
-
 
 type SExpr = 
   | Number of int
