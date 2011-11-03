@@ -2,12 +2,14 @@
 using System.Text;
 using System.Collections.Generic;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Microsoft.FSharp.Collections;
 
 namespace ParserTests {
 
     public abstract class ParserBaseTest {
         public void testParse<A>(Parsers.Parser<A> parser, string parseMe, A expected) {
             Assert.AreEqual(Parsers.get(parser.Parse(parseMe)), expected);
+            System.Collections.Generic.List<A> l;
         }
 
         public void testParseFailure<A>(Parsers.Parser<A> parser, string parseMe, A expected) {
@@ -16,7 +18,7 @@ namespace ParserTests {
         }
 
         public Microsoft.FSharp.Collections.FSharpList<A> mkFSList<A>(params A[] parsers) {
-            return Conversions.toFSharpList<A>(new List<A>(parsers));
+            return ListModule.OfSeq<A>(new List<A>(parsers));
         }
     }
 

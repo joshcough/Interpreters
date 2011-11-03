@@ -3,13 +3,14 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using Microsoft.FSharp.Core;
-using c=Conversions;
-using f=FuncConvert;
-
 namespace ParsersTestApp
 {
     class Program
     {
+        public FSharpFunc<T1, FSharpFunc<T2, TResult>> ToFS<T1, T2, TResult>(Func<T1, T2, TResult> f) {
+            return null;
+        }
+
         delegate int del(int i);
         static void Main(string[] args)
         {
@@ -34,12 +35,12 @@ namespace ParsersTestApp
             var op = FuncConvert.ToFSharpFunc<int, FSharpFunc<int, int>>(aa => 
                 FuncConvert.ToFSharpFunc<int, int>(bb => aa + bb)
             );
-            var zz = Conversions.apply(op, 1, 2);
+            var zz = MyModule.apply(op, 1, 2);
 
             // redo first attempt
-            c.f2(FuncConvert.ToFSharpFunc(new Converter<int, int>((x) => { return x + 6; })));
+            MyModule.f2(FuncConvert.ToFSharpFunc(new Converter<int, int>((x) => { return x + 6; })));
 
-            c.f2(f.ToFSharpFunc<int,int>(x => x + 6));
+            //c.f2(f.ToFSharpFunc<int,int>(x => x + 6));
         }
     }
 }

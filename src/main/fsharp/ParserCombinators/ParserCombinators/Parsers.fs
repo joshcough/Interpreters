@@ -74,7 +74,7 @@ let oneOfChars (cs:List<char>) : Parser<char> = oneOf (cs |> List.map matchChar)
 let oneToNine = oneOfChars ['1'..'9']
 let one: Parser<char> = matchChar '1'
 let zeroToNine = oneOfChars ['0'..'9']
-let digit: Parser<char> = zeroToNine
+let digit = zeroToNine
 let charListToString (cs: List<char>) : string = cs |> List.map string |> List.reduce (+)
 let charListToInt (cs: List<char>) : int = cs |> charListToString |> int
 let number: Parser<int> = oneOrMore(digit) ^^ charListToInt
@@ -92,9 +92,8 @@ type SExpr =
   | SList of List<SExpr>
 
 let rec sexpr = oneOf [number ^^ Number; id ^^ Atom; list ^^ SList]
-and listStart<'a> = matchChar('(') ^^^ lazy([])
-and listEnd<'a> = matchChar(')') ^^^ lazy([])
-and list = listStart +++ lazy(repsep(sexpr, spaces)) +++ lazy(listEnd) ^^ (fun ((_, l), _) -> l)
+and listBody = repsep(sexpr, spaces)
+and list = (matchChar('(') ^^^ lazy([])) +++ lazy(listBody) +++ lazy(matchChar(')') ^^^ lazy([])) ^^ (fun ((_, l), _) -> l)
 
 /// <summary>Blah blah blah <c>mapping</c> Blah blah blah.</summary>
 /// <param name="mapping">Yada yada yada</param>
