@@ -60,7 +60,6 @@ let rec oneOf<'a> (parsers: List<Parser<'a>>) : Parser<'a> =
     match parsers with
     | p :: ps -> p ||| oneOf<'a>(ps)
     | _ -> never()
-
 let matchChar (c:char): Parser<char> = {
     new Parser<char> with member p.Parse(s) = 
         if s.Length > 0 && s.[0] = c then Success(c, s.[1..]) else Failure("didn't find: " + c.ToString())
@@ -74,7 +73,6 @@ let anyCharBut (c:char) : Parser<char> = {
 let rec matchAll(ps:List<Parser<'a>>): Parser<List<'a>> = match ps with
     | [] -> always ^^^ lazy([])
     | p :: ps' -> p ++ matchAll(ps) ^^ List.Cons
-
 let matchWord (findMe:string): Parser<string> = 
     matchAll(ToList(findMe) |> List.map matchChar) ^^ (fun cs -> mkString(cs, ""))
 let rec zeroOrMore<'a> (p:Parser<'a>): Parser<List<'a>> =
@@ -82,6 +80,9 @@ let rec zeroOrMore<'a> (p:Parser<'a>): Parser<List<'a>> =
 let oneOrMore<'a> (p:Parser<'a>): Parser<List<'a>> = p ++ zeroOrMore<'a>(p) ^^ List.Cons
 let repsep<'a, 'b> (pa:Parser<'a>, pb:Parser<'b>) : Parser<List<'a>> =
     zeroOrMore(pa ++ pb ^^ fst) ++ (opt(pa) ^^ Option.toList) ^^ (fun (l, r) -> l @ r)
+let surroundedBy l p r = l ++ p ++ r ^^ (fun ((_, pr), _) -> pr)
+let surroundedByLazy (l:Parser<'l>, p:Lazy<Parser<'a>>, r:Parser<'r>) = l +++ p +++ lazy(r) ^^ (fun ((_, pr), _) -> pr)
+
 let oneOfChars (cs:List<char>) : Parser<char> = oneOf (cs |> List.map matchChar)
 let oneToNine = oneOfChars ['1'..'9']
 let one: Parser<char> = matchChar '1'
@@ -101,7 +102,7 @@ let idBody = zeroOrMore(oneOf([letter; digit; underscore]))
 let id = letter ++ idBody ^^ (fun (x, xs) -> x :: xs |> charListToString)
 
 let stringLitBody: Parser<string> = zeroOrMore(anyCharBut '"') ^^ charListToString
-let stringLit = (matchChar '"' ^^^ lazy("")) ++ stringLitBody ++ (matchChar '"' ^^^ lazy("")) ^^ (fun ((_, s), _) -> s)
+let stringLit = surroundedBy (matchChar '"') stringLitBody (matchChar '"')
 
 type SExpr = 
   | Number of int
@@ -115,8 +116,7 @@ type SExpr =
     | SList xs -> "(" + mkString(xs, " ") + ")"
 
 let rec sexpr = oneOf [number ^^ Number; id ^^ Atom; stringLit ^^ StrLit; list ^^ SList]
-and listBody = repsep(sexpr, spaces)
-and list = (matchChar('(') ^^^ lazy([])) +++ lazy(listBody) +++ lazy(matchChar(')') ^^^ lazy([])) ^^ (fun ((_, l), _) -> l)
+and list = surroundedByLazy (matchChar '(', lazy(repsep(sexpr, spaces)), matchChar ')')
 
 /// <summary>Blah blah blah <c>mapping</c> Blah blah blah.</summary>
 /// <param name="mapping">Yada yada yada</param>
