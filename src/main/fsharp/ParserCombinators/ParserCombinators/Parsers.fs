@@ -1,19 +1,21 @@
 ﻿module Parsers
 #light
 
+open Conversions
+
 type ParseResult<'a> = 
   | Success of 'a * string
   | Failure of string
-
-let get pr = match pr with
+  override self.ToString() = match self with
+    | Success(v, s) ->  sprintf "Success(%A, %s)" v s
+    | Failure(m) -> sprintf "Failure(%s)" m
+  member pr.Get = match pr with
     | Success(a, _) -> a
     | _ -> failwith("cant get from a failure")
-
-let isFailure pr =  match pr with 
-    | Failure(_) -> true
+  member pr.Failed = match pr with
+    | Failure _ -> true
     | _ -> false
-
-let getFailureMessage pr =  match pr with
+  member pr.GetFailureMessage =  match pr with
     | Failure(m) -> m
     | _ -> failwith("not a failure") 
 
@@ -39,6 +41,7 @@ let andThen(l:Parser<'a>,r:Lazy<Parser<'b>>) = {
             | Failure (message) -> Failure (message)
         | Failure (message) -> Failure (message)
 }
+
 let inline (++) (l:Parser<'a>)(r:Parser<'b>) = andThen(l, lazy(r)) 
 let inline (+++) (l:Parser<'a>)(r:Lazy<Parser<'b>>) = andThen(l,r) 
 let inline (^^^) (p:Parser<'a>)(v:Lazy<'b>) = {
@@ -46,27 +49,36 @@ let inline (^^^) (p:Parser<'a>)(v:Lazy<'b>) = {
         | Success (_, rest) -> Success(v.Force(), rest)
         | Failure (message) -> Failure(message)
 }
-
 let opt<'a>(p:Parser<'a>) = {
     new Parser<Option<'a>> with member this.Parse(s) = match p.Parse(s) with
         | Success (v, rest) -> Success(Some(v), rest)
         | Failure (message) -> Success(None, s)
 }
+let always = { new Parser<'a> with member p.Parse(s) = Success("", s) }
 let never<'a> () = { new Parser<'a> with member p.Parse(s) = Failure("never") }
 let rec oneOf<'a> (parsers: List<Parser<'a>>) : Parser<'a> = 
     match parsers with
     | p :: ps -> p ||| oneOf<'a>(ps)
     | _ -> never()
-let matchWord (findMe:string) = {
-    new Parser<string> with member p.Parse(s) = 
-        if findMe.Length <= s.Length && s.Substring(0, findMe.Length).Equals(findMe) 
-        then Success(findMe, s.Substring(findMe.Length)) 
-        else Failure("didn't find: " + findMe)
+
+let matchChar (c:char): Parser<char> = {
+    new Parser<char> with member p.Parse(s) = 
+        if s.Length > 0 && s.[0] = c then Success(c, s.[1..]) else Failure("didn't find: " + c.ToString())
 }
-let matchChar (c:char) = matchWord(string c) ^^ (fun s -> s.[0])
-let emptyString = matchWord("")
+let anyCharBut (c:char) : Parser<char> = {
+    new Parser<char> with member p.Parse(s) = 
+        if s.Length = 0 then Failure("end of stream avoiding: " + c.ToString())
+        else if s.[0] = c then Failure("tried to avoid it, but encountered: " + c.ToString())
+        else Success(s.[0], s.[1..])
+}
+let rec matchAll(ps:List<Parser<'a>>): Parser<List<'a>> = match ps with
+    | [] -> always ^^^ lazy([])
+    | p :: ps' -> p ++ matchAll(ps) ^^ List.Cons
+
+let matchWord (findMe:string): Parser<string> = 
+    matchAll(ToList(findMe) |> List.map matchChar) ^^ (fun cs -> mkString(cs, ""))
 let rec zeroOrMore<'a> (p:Parser<'a>): Parser<List<'a>> =
-    (p +++ lazy(zeroOrMore<'a>(p)) ^^ List.Cons) ||| (emptyString ^^^ lazy([]))
+    (p +++ lazy(zeroOrMore<'a>(p)) ^^ List.Cons) ||| (always ^^^ lazy([]))
 let oneOrMore<'a> (p:Parser<'a>): Parser<List<'a>> = p ++ zeroOrMore<'a>(p) ^^ List.Cons
 let repsep<'a, 'b> (pa:Parser<'a>, pb:Parser<'b>) : Parser<List<'a>> =
     zeroOrMore(pa ++ pb ^^ fst) ++ (opt(pa) ^^ Option.toList) ^^ (fun (l, r) -> l @ r)
@@ -75,23 +87,34 @@ let oneToNine = oneOfChars ['1'..'9']
 let one: Parser<char> = matchChar '1'
 let zeroToNine = oneOfChars ['0'..'9']
 let digit = zeroToNine
-let charListToString (cs: List<char>) : string = cs |> List.map string |> List.reduce (+)
-let charListToInt (cs: List<char>) : int = cs |> charListToString |> int
-let number: Parser<int> = oneOrMore(digit) ^^ charListToInt
+let number: Parser<int> = 
+    opt(matchChar '-') ++ (oneOrMore(digit) ^^ charListToInt) ^^ (fun (neg, i) -> match neg with
+        | Some(_) -> -i
+        | _ -> i)
+
 let space = oneOfChars [' '; '\n'; '\t']
 let spaces = zeroOrMore space
 let numbers = repsep(number, spaces)
-let letter = (oneOfChars ['a'..'z']) ||| (oneOfChars ['a'..'z'])
+let letter = (oneOfChars ['a'..'z']) ||| (oneOfChars ['A'..'Z'])
 let underscore = matchChar '_'
 let idBody = zeroOrMore(oneOf([letter; digit; underscore]))
 let id = letter ++ idBody ^^ (fun (x, xs) -> x :: xs |> charListToString)
 
+let stringLitBody: Parser<string> = zeroOrMore(anyCharBut '"') ^^ charListToString
+let stringLit = (matchChar '"' ^^^ lazy("")) ++ stringLitBody ++ (matchChar '"' ^^^ lazy("")) ^^ (fun ((_, s), _) -> s)
+
 type SExpr = 
   | Number of int
   | Atom of string
+  | StrLit of string
   | SList of List<SExpr>
+  override self.ToString() = match self with
+    | Number n -> string n
+    | Atom s ->  s
+    | StrLit s -> '"'.ToString() + s + '"'.ToString()
+    | SList xs -> "(" + mkString(xs, " ") + ")"
 
-let rec sexpr = oneOf [number ^^ Number; id ^^ Atom; list ^^ SList]
+let rec sexpr = oneOf [number ^^ Number; id ^^ Atom; stringLit ^^ StrLit; list ^^ SList]
 and listBody = repsep(sexpr, spaces)
 and list = (matchChar('(') ^^^ lazy([])) +++ lazy(listBody) +++ lazy(matchChar(')') ^^^ lazy([])) ^^ (fun ((_, l), _) -> l)
 

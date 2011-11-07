@@ -41,6 +41,18 @@ namespace ParsersTestApp
             MyModule.f2(FuncConvert.ToFSharpFunc(new Converter<int, int>((x) => { return x + 6; })));
 
             //c.f2(f.ToFSharpFunc<int,int>(x => x + 6));
+
+
+            Console.WriteLine(new Lazy<int>().Value);
+
+            var lazyDigit = new Lazy<Parsers.Parser<char>>(() => Parsers.digit);
+            var p = Parsers.andThen(Parsers.digit, lazyDigit);
+            Console.WriteLine(p.Parse("42aaaa").Get);
+            Console.WriteLine(p.Parse("42aaaa"));
+
+            Parsers.ParseResult<String>.NewFailure("hi");
+
+            Console.WriteLine(ParserChecks.x());
         }
     }
 }

@@ -51,6 +51,10 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\ParserChecks\ParserChecks.fsproj">
+      <Project>{8B2E0E7F-8CA7-47E8-B3B6-530044882EAF}</Project>
+      <Name>ParserChecks</Name>
+    </ProjectReference>
     <ProjectReference Include="..\ParserCombinators\Parsers.fsproj">
       <Project>{22FE3F9C-0651-48ED-8FAA-1F0CB87DF1AC}</Project>
       <Name>Parsers</Name>

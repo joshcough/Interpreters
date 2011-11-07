@@ -8,13 +8,13 @@ namespace ParserTests {
 
     public abstract class ParserBaseTest {
         public void testParse<A>(Parsers.Parser<A> parser, string parseMe, A expected) {
-            Assert.AreEqual(Parsers.get(parser.Parse(parseMe)), expected);
+            Assert.AreEqual(parser.Parse(parseMe).Get, expected);
             System.Collections.Generic.List<A> l;
         }
 
         public void testParseFailure<A>(Parsers.Parser<A> parser, string parseMe, A expected) {
             var p = parser.Parse(parseMe);
-            if (!Parsers.isFailure(p)) Assert.Fail("expected parse failure, but got: " + Parsers.get(p));
+            if (!p.Failed) Assert.Fail("expected parse failure, but got: " + p.Get);
         }
 
         public Microsoft.FSharp.Collections.FSharpList<A> mkFSList<A>(params A[] parsers) {
@@ -115,6 +115,16 @@ namespace ParserTests {
         public void TestNumbers2() {
             testParse(Parsers.numbers, "123 2   3673      4 5", mkFSList(123, 2, 3673, 4, 5));
         }
+
+        [TestMethod]
+        public void TestStringLit() {
+            testParse(Parsers.stringLit, "\"hi\"", "hi");
+        }
+
+        [TestMethod]
+        public void TestStringLit2() {
+            testParse(Parsers.stringLit, "\"hi world\"", "hi world");
+        }
     }
 
     [TestClass]
@@ -179,6 +189,11 @@ namespace ParserTests {
         [TestMethod]
         public void TestSExprList5() {
             testParse(Parsers.sexpr, "()", Parsers.SExpr.NewSList(mkFSList<Parsers.SExpr>()));
+        }
+
+        [TestMethod]
+        public void RunSExprChecks() {
+            ParserChecks.x();
         }
     }
 }
