@@ -9,25 +9,19 @@ type ParseResult<'a> =
   override self.ToString() = match self with
     | Success(v, s) ->  sprintf "Success(%A, %s)" v s
     | Failure(m) -> sprintf "Failure(%s)" m
-  member pr.Get = match pr with
-    | Success(a, _) -> a
-    | _ -> failwith("cant get from a failure")
-  member pr.Failed = match pr with
-    | Failure _ -> true
-    | _ -> false
-  member pr.GetFailureMessage =  match pr with
-    | Failure(m) -> m
-    | _ -> failwith("not a failure") 
+  member pr.Get = match pr with | Success(a, _) -> a | _ -> failwith("cant get from a failure")
+  member pr.Failed = match pr with | Failure _ -> true | _ -> false
+  member pr.GetFailureMessage = match pr with | Failure(m) -> m | _ -> failwith("not a failure") 
 
 type Parser<'a> =
     abstract member Parse: string -> ParseResult<'a>
 
-let inline (^^) (p:Parser<'a>)(f: 'a -> 'b) =  { 
+let (^^) (p:Parser<'a>)(f: 'a -> 'b) =  { 
     new Parser<'b> with member this.Parse(s) =  match p.Parse(s) with
         | Success (a, rest) -> Success(f(a), rest)
         | Failure (message) -> Failure(message)
 }                 
-let inline (|||) (l:Parser<'a>)(r:Parser<'a>) = {
+let (|||) (l:Parser<'a>)(r:Parser<'a>) = {
     new Parser<'a> with member this.Parse(s) = match l.Parse(s) with
         | Success (al, rest) -> Success(al, rest)
         | Failure (leftMessage) -> match r.Parse(s) with
@@ -42,9 +36,9 @@ let andThen(l:Parser<'a>,r:Lazy<Parser<'b>>) = {
         | Failure (message) -> Failure (message)
 }
 
-let inline (++) (l:Parser<'a>)(r:Parser<'b>) = andThen(l, lazy(r)) 
-let inline (+++) (l:Parser<'a>)(r:Lazy<Parser<'b>>) = andThen(l,r) 
-let inline (^^^) (p:Parser<'a>)(v:Lazy<'b>) = {
+let (++) (l:Parser<'a>)(r:Parser<'b>) = andThen(l, lazy(r)) 
+let (+++) (l:Parser<'a>)(r:Lazy<Parser<'b>>) = andThen(l,r) 
+let (^^^) (p:Parser<'a>)(v:Lazy<'b>) = {
     new Parser<'b> with member this.Parse(s) = match p.Parse(s) with
         | Success (_, rest) -> Success(v.Force(), rest)
         | Failure (message) -> Failure(message)
@@ -54,7 +48,7 @@ let opt<'a>(p:Parser<'a>) = {
         | Success (v, rest) -> Success(Some(v), rest)
         | Failure (message) -> Success(None, s)
 }
-let always = { new Parser<'a> with member p.Parse(s) = Success("", s) }
+let always = { new Parser<string> with member p.Parse(s) = Success("", s) }
 let never<'a> () = { new Parser<'a> with member p.Parse(s) = Failure("never") }
 let rec oneOf<'a> (parsers: List<Parser<'a>>) : Parser<'a> = 
     match parsers with
@@ -80,8 +74,9 @@ let rec zeroOrMore<'a> (p:Parser<'a>): Parser<List<'a>> =
 let oneOrMore<'a> (p:Parser<'a>): Parser<List<'a>> = p ++ zeroOrMore<'a>(p) ^^ List.Cons
 let repsep<'a, 'b> (pa:Parser<'a>, pb:Parser<'b>) : Parser<List<'a>> =
     zeroOrMore(pa ++ pb ^^ fst) ++ (opt(pa) ^^ Option.toList) ^^ (fun (l, r) -> l @ r)
-let surroundedBy l p r = l ++ p ++ r ^^ (fun ((_, pr), _) -> pr)
-let surroundedByLazy (l:Parser<'l>, p:Lazy<Parser<'a>>, r:Parser<'r>) = l +++ p +++ lazy(r) ^^ (fun ((_, pr), _) -> pr)
+let surroundedByLazy (l:Parser<'l>, p:Lazy<Parser<'a>>, r:Parser<'r>) = 
+    l +++ p +++ lazy(r) ^^ (fun ((_, pr), _) -> pr)
+let surroundedBy l p r = surroundedByLazy(l, lazy(p), r)
 
 let oneOfChars (cs:List<char>) : Parser<char> = oneOf (cs |> List.map matchChar)
 let oneToNine = oneOfChars ['1'..'9']
@@ -89,9 +84,8 @@ let one: Parser<char> = matchChar '1'
 let zeroToNine = oneOfChars ['0'..'9']
 let digit = zeroToNine
 let number: Parser<int> = 
-    opt(matchChar '-') ++ (oneOrMore(digit) ^^ charListToInt) ^^ (fun (neg, i) -> match neg with
-        | Some(_) -> -i
-        | _ -> i)
+    opt(matchChar '-') ++ (oneOrMore(digit) ^^ charListToInt) ^^ 
+    (fun (neg, i) -> match neg with | Some(_) -> -i | _ -> i)
 
 let space = oneOfChars [' '; '\n'; '\t']
 let spaces = zeroOrMore space
