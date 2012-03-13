@@ -1,6 +1,6 @@
 package typecheck
 
-object TypeChecker {
+object TypeCheckerWithExplicitTypes {
 
   sealed trait Type
   case object NumT extends Type

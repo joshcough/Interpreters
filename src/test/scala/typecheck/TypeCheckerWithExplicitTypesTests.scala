@@ -1,11 +1,11 @@
 package typecheck
 
-import TypeChecker._
+import TypeCheckerWithExplicitTypes._
 
 import org.scalacheck.Prop._
 import org.scalacheck.Properties
 
-object TypeCheckerTests extends Properties("typecheck.TypeChecker"){
+object TypeCheckerWithExplicitTypesTests extends Properties("TypeCheckerWithExplicitTypes"){
   def typeCheck(exp:TFAE, expected:Type, env:TypeEnv = Nil) = {
     property(exp.toString) = secure {
       val result = realTypeCheckExpr(exp, env)
