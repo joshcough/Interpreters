@@ -1,5 +1,17 @@
 package typecheck
 
+/**
+ * This language requires the user to put explicit type declarations on
+ * all function arguments.
+ *
+ * It has three types: Int, Bool, and Arrow (List T) T
+ *
+ * There are also a few built-in functions: add, sub, and eql, which take two int arguments.
+ *
+ * The type checker here pretty much just makes sure that the actual types line up
+ * with the annotations. This is nothing fancy, but it gives us a framework for starting
+ * to explore type inference.
+ */
 object TypeCheckerWithExplicitTypes {
 
   sealed trait Type
