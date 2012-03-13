@@ -65,6 +65,4 @@ trait Reader {
     case i:Int => i.toString
     case l:List[Any] => l.map(printSExp).mkString("(", " ", ")")
   }
-
 }
-//  testRead("([xlt2 (< x 2)])", List(Symbol("["), 'xlt2, List('<, 'x, 2), Symbol("]")))

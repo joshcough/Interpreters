@@ -1,10 +1,11 @@
 package reader
 
-import org.scalatest.FunSuite
-import org.scalatest.matchers.MustMatchers
 import io.Reader
 
-class ReaderTest extends FunSuite with MustMatchers {
+import org.scalacheck.Prop._
+import org.scalacheck.Properties
+
+object ReaderTest extends Properties("Reader"){
 
   // primitivate cases
   testRead("0", 0)
@@ -32,11 +33,11 @@ class ReaderTest extends FunSuite with MustMatchers {
     List('hey, List('hey, 'world), 'world, 1, List(1, 2)))
 
   // error cases
-  testRead("'aa'", Error("unclosed character literal"))
-  testRead("'a", Error("unclosed character literal"))
-  testRead("\"a", Error("unclosed string literal"))
-  testRead("(a", Error("unclosed list"))
-  testRead(")", Error("unexpected list terminator"))
+  testReadError("'aa'", "unclosed character literal")
+  testReadError("'a", "unclosed character literal")
+  testReadError("\"a", "unclosed string literal")
+  testReadError("(a", "unclosed list")
+  testReadError(")", "unexpected list terminator")
 
   testRead("""(
   :aint_gonna_happen
@@ -68,7 +69,6 @@ x
 -16
 s_""", (List(Symbol(":x"), List('call, Symbol(":x"))),"x -16 s_"))
 
-
   testRead("([xlt2 (< x 2)])", List(List('xlt2, List('<, 'x, 2))))
   testRead("((xlt2 (< x 2)))", List(List('xlt2, List('<, 'x, 2))))
   testRead("(let ([x 7]) x)", List('let, List(List('x, 7)), 'x))
@@ -78,10 +78,14 @@ s_""", (List(Symbol(":x"), List('call, Symbol(":x"))),"x -16 s_"))
   // helper functions
   def read(s:String) = new Reader{}.read(s)
   def readWithRest(s:String) = new Reader{}.readWithRest(s)
-  case class Error(message:String)
-  def testRead(s: String, a: Any) = test(s + " => " + a){ read(s) must be(a) }
-  def testReadWithRest(s: String, a: Any) = test(s + " => " + a){ readWithRest(s) must be(a) }
-  def testRead(s:String,e:Error) = {
-    test(s + " => " + e){ intercept[Throwable]{ read(s) }.getMessage must be(e.message) }
+  def testRead(s: String, a: Any) = property(s + " => " + a) = secure {
+    read(s) == a
+  }
+  def testReadWithRest(s: String, a: Any) = property(s + " => " + a) = secure{
+    readWithRest(s) == a
+  }
+  def testReadError(s:String,e:String) = property(s + " => " + e) = secure{
+    val om = try{ read(s); None } catch { case ex => Some(ex.getMessage) }
+    e ?= om.getOrElse(sys.error("expected a read failure, but didnt get one."))
   }
 }
