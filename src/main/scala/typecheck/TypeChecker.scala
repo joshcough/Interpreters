@@ -1,3 +1,4 @@
+package typecheck
 
 object TypeChecker {
 

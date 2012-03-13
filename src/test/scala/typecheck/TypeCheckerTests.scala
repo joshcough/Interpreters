@@ -1,11 +1,12 @@
+package typecheck
+
 import TypeChecker._
 
 import org.scalacheck.Prop._
 import org.scalacheck.Properties
 
-object TypeCheckerTests extends Properties("TypeChecker"){
+object TypeCheckerTests extends Properties("typecheck.TypeChecker"){
   def typeCheck(exp:TFAE, expected:Type, env:TypeEnv = Nil) = {
-    val result = realTypeCheckExpr(exp, env)
     property(exp.toString) = secure {
       val result = realTypeCheckExpr(exp, env)
       if(result != expected) println("expected: " + expected + ", got: " + result)
