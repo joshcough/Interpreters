@@ -6,7 +6,7 @@ import org.scalacheck.Prop._
 import org.scalacheck.Properties
 
 object TypeCheckerWithExplicitTypesTests extends Properties("TypeCheckerWithExplicitTypes"){
-  def typeCheck(exp:TFAE, expected:Type, env:TypeEnv = Nil) = {
+  def typeCheck(exp:Tree, expected:Type, env:TypeEnv = Nil) = {
     property(exp.toString) = secure {
       val result = realTypeCheckExpr(exp, env)
       if(result != expected) println("expected: " + expected + ", got: " + result)
@@ -28,8 +28,8 @@ object TypeCheckerWithExplicitTypesTests extends Properties("TypeCheckerWithExpl
   //    (test/exn (type-check-expr (eql (bool #t)Num(8)))
   //    "eql: type-error expected: NumT in position 1, but found: (boolT)")
 
-  typeCheck(IfThenElse(Bool(true), Num(8), Num(9)), NumT)
-  typeCheck(IfThenElse(Bool(false), Num(8), Num(9)), NumT)
+  typeCheck(If(Bool(true), Num(8), Num(9)), NumT)
+  typeCheck(If(Bool(false), Num(8), Num(9)), NumT)
 
   //    (test (type-check-expr (ifthenelse (bool #f) Num(8)Num(9))) NumT)
   //    (test/exn
@@ -78,7 +78,7 @@ object TypeCheckerWithExplicitTypesTests extends Properties("TypeCheckerWithExpl
     NumT
   )
   typeCheck(
-    App(Fun(List('x -> NumT, 'y->BoolT), IfThenElse(Id('y), Add(Id('x), Num(5)), Num(0))), List(Num(7), Bool(false))),
+    App(Fun(List('x -> NumT, 'y->BoolT), If(Id('y), Add(Id('x), Num(5)), Num(0))), List(Num(7), Bool(false))),
     NumT
   )
   typeCheck(
