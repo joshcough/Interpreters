@@ -1,6 +1,9 @@
 package typecheck
 
 /**
+ * Note: A lot of this code is a port from:
+ *   http://fsharpcode.blogspot.com/2010/08/hindley-milner-type-inference-sample.html
+ *
  * TODO: comment is out of date.
  *
  * I'm writing this to explore type checking with type inference in Scala.
