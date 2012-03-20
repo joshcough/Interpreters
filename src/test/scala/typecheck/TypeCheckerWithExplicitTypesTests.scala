@@ -8,7 +8,7 @@ import org.scalacheck.Properties
 object TypeCheckerWithExplicitTypesTests extends Properties("TypeCheckerWithExplicitTypes"){
   def typeCheck(exp:Tree, expected:Type, env:TypeEnv = Nil) = {
     property(exp.toString) = secure {
-      val result = realTypeCheckExpr(exp, env)
+      val result = TypeCheckerWithExplicitTypes.typeCheck(exp, env)
       if(result != expected) println("expected: " + expected + ", got: " + result)
       result == expected
     }

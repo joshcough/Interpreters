@@ -66,34 +66,31 @@ object TypeCheckerWithExplicitTypes {
 
   type TypeEnv = List[(Symbol, Type)]
 
-  // the top level type check function (starts with an empty type environment)
-  def typeCheckExpr(expr: Tree): Type = realTypeCheckExpr(expr, Nil)
-
   // the real type check function, which works with the type environment.
-  def realTypeCheckExpr(expr: Tree, env: TypeEnv): Type = expr match {
+  def typeCheck(expr: Tree, env: TypeEnv=Nil): Type = expr match {
     case Num(n) => NumT
     case Bool(b) => BoolT
     case Id(x) => env.find(_._1 == x).map(_._2).getOrElse(sys.error("not found: " + x))
     case Add(l, r) => mathTypeCheck(l, r, env, NumT, "add")
     case Sub(l, r) => mathTypeCheck(l, r, env, NumT, "sub")
     case Eql(l, r) => mathTypeCheck(l, r, env, BoolT, "add")
-    case If(tst, texp, fexp) => realTypeCheckExpr(tst, env) match {
+    case If(tst, texp, fexp) => typeCheck(tst, env) match {
       // make sure the first branch is a BoolT
       case BoolT =>
-        val lType = realTypeCheckExpr(texp, env)
-        val rType = realTypeCheckExpr(fexp, env)
+        val lType = typeCheck(texp, env)
+        val rType = typeCheck(fexp, env)
         // make sure the second and third branches have the same type
         // if so, return that type. if not, bomb.
         if(lType == rType) lType
         else sys.error("error: if branches not the same type, got: " + (lType, rType))
       case t => sys.error("error: ifthenelse required bool in test position, but got: " + t)
     }
-    case Fun(formals, body) => ArrowT(formals.map(_._2), realTypeCheckExpr(body, formals ++ env))
-    case App(operator, operands) => realTypeCheckExpr(operator, env) match {
+    case Fun(formals, body) => ArrowT(formals.map(_._2), typeCheck(body, formals ++ env))
+    case App(operator, operands) => typeCheck(operator, env) match {
       // make sure the first argument to function application is indeed a function
       case ArrowT(argTypes, resultType) =>
         // then make sure that the arguments match the explicit declarations
-        if(argTypes.zip(operands.map(realTypeCheckExpr(_, env))).forall(tt => tt._1 == tt._2)) resultType
+        if(argTypes.zip(operands.map(typeCheck(_, env))).forall(tt => tt._1 == tt._2)) resultType
         else sys.error("function expected args of type: " + argTypes.mkString(", ") + ", but got: " + operands.mkString(", "))
       case t => sys.error("function application expected function, but got: " + t)
     }
@@ -104,7 +101,7 @@ object TypeCheckerWithExplicitTypes {
    * (IntT for add and sub, BoolT for eql). If not, bomb.
    */
   def mathTypeCheck(l: Tree, r: Tree, env: TypeEnv, returnType: Type, function: String): Type = {
-    (realTypeCheckExpr(l, env), realTypeCheckExpr(r, env)) match {
+    (typeCheck(l, env), typeCheck(r, env)) match {
       case (lt, rt) if lt == rt => returnType
       case (lt, rt) => sys.error("error: " + function + " expected two NumT arguments, but got: " + (lt, rt))
     }
