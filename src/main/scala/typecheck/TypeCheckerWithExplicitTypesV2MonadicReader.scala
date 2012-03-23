@@ -1,15 +1,11 @@
 package typecheck
 
 import scalaz._
-import scalaz.{Validation, Monad, Identity, EitherT, ReaderT}
+import scalaz.ReaderT
 import Kleisli._
 import scalaz.syntax.monad._
-import scalaz.Unapply._
 import scalaz.std.either._
 
-/**
- *
- */
 object TypeCheckerWithExplicitTypesV2MonadicReader {
 
   trait Literal
