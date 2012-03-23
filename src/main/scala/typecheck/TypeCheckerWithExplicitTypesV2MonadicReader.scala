@@ -53,20 +53,16 @@ object TypeCheckerWithExplicitTypesV2MonadicReader {
     env.find(_._1 == s).map(p => Right(p._2)).getOrElse(Left("not found: " + s))
 
   // k essentially promotes an Either to a Kleisli.
-  def k(e:Either[String, Type])= kleisli[V, TypeEnv, Type]((env: TypeEnv) => e)
+  def k[T,U](e:Either[String, U])= kleisli[V, T, U]((env: T) => e)
 
   // TODO: i should be able to import this from somewhere in scalaz
   def local[F[_], A, R](f: (R) => R)(fa: Kleisli[F, R, A]): Kleisli[F, R, A] =
     Kleisli[F, R, A](r => fa.run(f(r)))
 
   def typeCheck(expr: Exp): ReaderT[V, TypeEnv, Type] = expr match {
-    // TODO: runar says uses liftM here, but things arent working right.
     case Lit(v) => k(Right(litToTy(v)))
     case Id(x) => for {
       env <- ask[V, TypeEnv]
-      // TODO: I *think* want something like this here, but it doesn't compile:
-      // res <- find(x, env)
-      // so, im forced into doing this:
       res <- k(find(x, env))
     } yield res
     case If(tst, texp, fexp) => for {
