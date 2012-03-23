@@ -53,26 +53,25 @@ object TypeCheckerWithExplicitTypesV2Monadic {
   def typeCheck(expr: Exp, env: TypeEnv=predef): Validation[String, Type] = expr match {
     case Lit(v) => success(litToTy(v))
     case Id(x) => env.find(_._1 == x).map(p => success(p._2)).getOrElse(failure("not found: " + x))
-    case If(tst, texp, fexp) => for{
-      t <- typeCheck(tst, env)
+    case If(tst, texp, fexp) => for {
       // make sure the first branch is a boolean
+      t <- typeCheck(tst, env)
       _ <- if(t == boolT) success(boolT) else failure("if required bool in test position, but got: " + t)
+      // make sure the second and third branches have the same type
       lt <- typeCheck(texp, env)
       rt <- typeCheck(fexp, env)
-      // make sure the second and third branches have the same type
       result <- if(lt == rt) success(lt) else failure("if branches not the same type, got: " + (lt, rt))
     } yield result
-    case Fun(arg, argType, body) => for{ t <- typeCheck(body, env + (arg -> argType)) } yield TyLam(argType, t)
+    case Fun(arg, argType, body) => for { t <- typeCheck(body, env + (arg -> argType)) } yield TyLam(argType, t)
     case App(operator, operand) => for {
       t <- typeCheck(operator, env)
       res <- t match {
-        case TyLam(argType, resultType) =>
-          for {
-            operandType <- typeCheck(operand, env)
-            res2 <-
-              if(argType == operandType) success(resultType)
-              else failure("function expected arg of type: " + argType + ", but got: " + operandType)
-          } yield res2
+        case TyLam(argType, resultType) => for {
+          operandType <- typeCheck(operand, env)
+          res2 <-
+            if(argType == operandType) success(resultType)
+            else failure("function expected arg of type: " + argType + ", but got: " + operandType)
+        } yield res2
         case _ => failure("function application expected function, but got: " + t)
       }
     } yield res
