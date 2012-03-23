@@ -45,40 +45,36 @@ object TypeCheckerWithExplicitTypesV2MonadicReader {
     //  tv => "if" -> (TyLam(boolT, TyLam(tv, TyLam(tv, tv))), Set())
   )
 
-  // the real type check function, which works with the type environment.
+  // promote an either to a Kleisli, ignoring the environment.
+  def liftK[T,U](e:Either[String, U])= kleisli[V, T, U]((env: T) => e)
 
   type V[T] = Either[String, T]
-  
-  def find(s:String, env:TypeEnv): Either[String, Type] =
-    env.find(_._1 == s).map(p => Right(p._2)).getOrElse(Left("not found: " + s))
-
-  // k essentially promotes an Either to a Kleisli.
-  def k[T,U](e:Either[String, U])= kleisli[V, T, U]((env: T) => e)
 
   // TODO: i should be able to import this from somewhere in scalaz
   def local[F[_], A, R](f: (R) => R)(fa: Kleisli[F, R, A]): Kleisli[F, R, A] =
     Kleisli[F, R, A](r => fa.run(f(r)))
 
+  def typeError(s:String) = Left(s)
+  def success(t:Type) = Right(t)
+
+  def find(s:String, env:TypeEnv): Either[String, Type] =
+    env.find(_._1 == s).map(p => Right(p._2)).getOrElse(Left("not found: " + s))
+
+  def checkEqual(t1:Type, t2: Type, resultType: Type, errorMessage: String) =
+    if(t1 == t2) success(resultType) else typeError(errorMessage)
+
+  // the real type check function, which works with the type environment.
   def typeCheck(expr: Exp): ReaderT[V, TypeEnv, Type] = expr match {
-    case Lit(v) => k(Right(litToTy(v)))
-    case Id(x) => for {
-      env <- ask[V, TypeEnv]
-      res <- k(find(x, env))
-    } yield res
+    case Lit(v) =>liftK(success(litToTy(v)))
+    case Id(x) => for (env <- ask[V, TypeEnv]; res <-liftK(find(x, env))) yield res
     case If(tst, texp, fexp) => for {
       // make sure the first branch is a boolean
       t <- typeCheck(tst)
-      _ <- k(
-        if(t == boolT) Right(boolT)
-        else Left("if required bool in test position, but got: " + t)
-      )
+      _ <-liftK(checkEqual(t, boolT, resultType=boolT, "if required bool in test position, but got: " + t))
       // make sure the second and third branches have the same type
       lt <- typeCheck(texp)
       rt <- typeCheck(fexp)
-      result <- k(
-        if(lt == rt) Right(lt)
-        else Left("if branches not the same type, got: " + (lt, rt))
-      )
+      result <-liftK(checkEqual(lt, rt, resultType = lt, "if branches not the same type, got: " + (lt, rt)))
     } yield result
     case Fun(arg, argType, body) => for {
       t <- local((env:TypeEnv) => env + (arg -> argType))(typeCheck(body))
@@ -86,11 +82,10 @@ object TypeCheckerWithExplicitTypesV2MonadicReader {
     case App(operator, operand) => for {
       opType <- typeCheck(operator)
       operandType <- typeCheck(operand)
-      res <- k(opType match {
-        case TyLam(argType, resultType) =>
-          if(argType == operandType) Right(resultType)
-          else Left("function expected arg of type: " + argType + ", but got: " + operandType)
-        case _ => Left("function application expected function, but got: " + opType)
+      res <-liftK(opType match {
+        case TyLam(argType, resultType) => checkEqual(argType, operandType, resultType,
+          "function expected arg of type: " + argType + ", but got: " + operandType)
+        case _ => typeError("function application expected function, but got: " + opType)
       })
     } yield res
   }
