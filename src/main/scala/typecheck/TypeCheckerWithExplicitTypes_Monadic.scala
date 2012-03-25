@@ -1,8 +1,5 @@
 package typecheck
 
-/**
- *
- */
 object TypeCheckerWithExplicitTypes_Monadic {
 
   import TypeCheckerWithExplicitTypesAST._
@@ -29,22 +26,21 @@ object TypeCheckerWithExplicitTypes_Monadic {
       _ <- compare(t, boolT, boolT, "if required bool in test position, but got: " + t)
       lt <- typeCheck(texp, env)
       rt <- typeCheck(fexp, env)
-      result <- compare(lt, rt, lt, "if branches not the same type, got: " + (lt, rt))
-    } yield result
+      res <- compare(lt, rt, lt, "if branches not the same type, got: " + (lt, rt))
+    } yield res
     case Fun(arg, argType, body) => for {
       t <- typeCheck(body, env + (arg -> argType))
     } yield TyLam(argType, t)
     // make sure the first argument to function application is indeed a function
     // then make sure that the arguments match the explicit declarations
     case App(operator, operand) => for {
-      t <- typeCheck(operator, env)
-      res <- t match {
-        case TyLam(argType, resultType) => for {
-          operandType <- typeCheck(operand, env)
-          res2 <- compare(argType, operandType, resultType,
+      operatorType <- typeCheck(operator, env)
+      operandType  <- typeCheck(operand, env)
+      res <- operatorType match {
+        case TyLam(argType, resultType) =>
+          compare(argType, operandType, resultType,
             "function expected arg of type: " + argType + ", but got: " + operandType)
-        } yield res2
-        case _ => typeError("function application expected function, but got: " + t)
+        case _ => typeError("function application expected function, but got: " + operatorType)
       }
     } yield res
   }
