@@ -6,7 +6,7 @@ import scalaz.std.either._
 /**
  *
  */
-object TypeCheckerWithExplicitTypesV2Monadic {
+object TypeCheckerWithExplicitTypes_Monadic {
 
   trait Literal
   case class Num(i:Int) extends Literal

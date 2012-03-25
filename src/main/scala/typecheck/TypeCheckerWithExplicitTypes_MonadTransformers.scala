@@ -5,7 +5,7 @@ import scalaz.Kleisli
 import scalaz.Kleisli._
 import scalaz.std.either._
 
-object TypeCheckerWithExplicitTypesV2MonadicReader {
+object TypeCheckerWithExplicitTypes_MonadTransformers {
 
   trait Literal
   case class Num(i:Int) extends Literal
