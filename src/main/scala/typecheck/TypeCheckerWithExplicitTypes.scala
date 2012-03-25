@@ -66,10 +66,10 @@ object TypeCheckerWithExplicitTypes {
     // make sure the first branch is a boolean and then
     // make sure the second and third branches have the same type
     case If(tst, texp, fexp) =>
-      val t  = typeCheck(tst, env)
-      val _ = compare(t, boolT, boolT, "error: if required bool in test position, but got: " + t)
-      val lt = typeCheck(texp, env)
-      val rt = typeCheck(fexp, env)
+      val t   = typeCheck(tst, env)
+      val _   = compare(t, boolT, boolT, "error: if required bool in test position, but got: " + t)
+      val lt  = typeCheck(texp, env)
+      val rt  = typeCheck(fexp, env)
       val res = compare(lt, rt, lt, "error: if branches not the same type, got: " + (lt, rt))
       res
     case Fun(arg, argType, body) =>
