@@ -1,8 +1,7 @@
 package typecheck
 
 import scalaz.syntax.monad._
-import scalaz.{Validation, Monad, Identity}
-import Validation._
+import scalaz.std.either._
 
 /**
  *
@@ -27,7 +26,7 @@ object TypeCheckerWithExplicitTypesV2Monadic {
 
   type TypeEnv = Map[String, Type]
 
-  val numT = TyCon("Num", Nil)
+  val numT  = TyCon("Num", Nil)
   val boolT = TyCon("Bool", Nil)
 
   def litToTy(l:Literal): Type = l match {
@@ -46,33 +45,40 @@ object TypeCheckerWithExplicitTypesV2Monadic {
     //  tv => "if" -> (TyLam(boolT, TyLam(tv, TyLam(tv, tv))), Set())
   )
 
-  def find(x: String, env: TypeEnv): Validation[String, Type] =
-    env.find(_._1 == x).map(p => success(p._2)).getOrElse(failure("not found: " + x))
+  def find(s:String, env:TypeEnv): Either[String, Type] =
+    env.find(_._1 == s).map(p => success(p._2)).getOrElse(typeError("not found: " + s))
+  
+  def success(t:Type) = Right(t)
+  def typeError(msg:String) = Left(msg)
+
+  def compare(t1: Type, t2: Type, resultType: Type, errorMsg: String): Either[String, Type] =
+    if(t1 == t2) success(resultType) else typeError(errorMsg)
 
   // the real type check function, which works with the type environment.
-  def typeCheck(expr: Exp, env: TypeEnv=predef): Validation[String, Type] = expr match {
+  def typeCheck(expr: Exp, env: TypeEnv=predef): Either[String, Type] = expr match {
     case Lit(v) => success(litToTy(v))
-    case Id(x) => env.find(_._1 == x).map(p => success(p._2)).getOrElse(failure("not found: " + x))
+    case Id(x)  => find(x, env)
+    // make sure the first branch is a boolean and then
+    // make sure the second and third branches have the same type
     case If(tst, texp, fexp) => for {
-      // make sure the first branch is a boolean
       t <- typeCheck(tst, env)
-      _ <- if(t == boolT) success(boolT) else failure("if required bool in test position, but got: " + t)
-      // make sure the second and third branches have the same type
+      _ <- compare(t, boolT, boolT, "if required bool in test position, but got: " + t)
       lt <- typeCheck(texp, env)
       rt <- typeCheck(fexp, env)
-      result <- if(lt == rt) success(lt) else failure("if branches not the same type, got: " + (lt, rt))
+      result <- compare(lt, rt, lt, "if branches not the same type, got: " + (lt, rt))
     } yield result
-    case Fun(arg, argType, body) => for { t <- typeCheck(body, env + (arg -> argType)) } yield TyLam(argType, t)
+    case Fun(arg, argType, body) => for {
+      t <- typeCheck(body, env + (arg -> argType))
+    } yield TyLam(argType, t)
     case App(operator, operand) => for {
       t <- typeCheck(operator, env)
       res <- t match {
         case TyLam(argType, resultType) => for {
           operandType <- typeCheck(operand, env)
-          res2 <-
-            if(argType == operandType) success(resultType)
-            else failure("function expected arg of type: " + argType + ", but got: " + operandType)
+          res2 <- compare(argType, operandType, resultType,
+            "function expected arg of type: " + argType + ", but got: " + operandType)
         } yield res2
-        case _ => failure("function application expected function, but got: " + t)
+        case _ => typeError("function application expected function, but got: " + t)
       }
     } yield res
   }

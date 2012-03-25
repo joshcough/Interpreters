@@ -66,7 +66,7 @@ object TypeCheckerWithExplicitTypesV2 {
 
   type TypeEnv = Map[String, Type]
 
-  val numT = TyCon("Num", Nil)
+  val numT  = TyCon("Num", Nil)
   val boolT = TyCon("Bool", Nil)
 
   def litToTy(l:Literal): Type = l match {

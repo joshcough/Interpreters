@@ -8,7 +8,8 @@ package typecheck
  *
  * I'm writing this to explore type checking with type inference in Scala.
  *
- * To do this, I'm starting with a very simple language that allows only one top level expression.
+ * To do this, I'm starting with a very simple language that allows
+ * only one top level expression.
  *
  * The language has three types: Int, Bool, and Arrow (List T) T
  * and corresponding literals for those types (shown in examples below).
@@ -87,7 +88,8 @@ object TypeCheckerWithInference {
     val result = (subs(a, s), subs(b, s)) match {
       case (TyVar(ta), TyVar(tb)) if ta == tb => s
       // this does the 'occurs' check for infinite types.
-      case (TyVar(ta), _) if (! getTVarsOfType(b).contains(ta)) => extend(ta, b, s)
+      case (TyVar(ta), _) if (! getTVarsOfType(b).contains(ta)) =>
+        extend(ta, b, s)
       case (_, TyVar(_)) => mgu(b, a, s)
       case (TyLam(a1, b1), TyLam(a2, b2)) => mgu(a1, a2, mgu(b1, b2, s))
       case (TyCon(name1, args1), TyCon(name2, args2)) if name1 == name2 =>
@@ -98,7 +100,8 @@ object TypeCheckerWithInference {
     result
   }
 
-  // Calculate the principal type scheme for an expression in a given typing environment
+  // Calculate the principal type scheme for an expression in a given
+  // typing environment
   def tp(env: Env, exp: Exp, bt: Type, s: Subst): Subst = exp match {
     case Lit(v) => mgu(litToTy(v), bt, s)
     case Var(n) => env.get(n).map{

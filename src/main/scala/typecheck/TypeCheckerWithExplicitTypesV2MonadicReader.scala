@@ -1,9 +1,8 @@
 package typecheck
 
-import scalaz._
 import scalaz.ReaderT
-import Kleisli._
-import scalaz.syntax.monad._
+import scalaz.Kleisli
+import scalaz.Kleisli._
 import scalaz.std.either._
 
 object TypeCheckerWithExplicitTypesV2MonadicReader {
@@ -26,7 +25,7 @@ object TypeCheckerWithExplicitTypesV2MonadicReader {
 
   type TypeEnv = Map[String, Type]
 
-  val numT = TyCon("Num", Nil)
+  val numT  = TyCon("Num", Nil)
   val boolT = TyCon("Bool", Nil)
 
   def litToTy(l:Literal): Type = l match {
@@ -50,7 +49,7 @@ object TypeCheckerWithExplicitTypesV2MonadicReader {
   type V[T] = Either[String, T]
   
   def find(s:String, env:TypeEnv): Either[String, Type] =
-    env.find(_._1 == s).map(p => Right(p._2)).getOrElse(Left("not found: " + s))
+    env.find(_._1 == s).map(p => success(p._2)).getOrElse(typeError("not found: " + s))
 
   // liftK essentially promotes an Either to a Kleisli.
   def liftK[T,U](e:Either[String, U])= kleisli[V, T, U]((env: T) => e)
