@@ -48,67 +48,43 @@ package typecheck
  */
 object TypeCheckerWithExplicitTypes {
 
-  trait Literal
-  case class Num(i:Int) extends Literal
-  case class Bool(b:Boolean) extends Literal
+  import TypeCheckerWithExplicitTypesAST._
 
-  sealed trait Exp
-  case class Id(name:String) extends Exp
-  case class Fun(arg: String, argType: Type, body: Exp) extends Exp
-  case class App(f:Exp, arg: Exp) extends Exp
-  case class Lit(l:Literal) extends Exp
-  case class If(tst:Exp, thn:Exp, els:Exp) extends Exp
+  def success(t:Type) = t
+  def typeError(msg:String) = sys.error(msg)
 
-  trait Type
-  case class TyLam(f:Type, arg:Type) extends Type
-  case class TyCon(name:String, args: List[Type]) extends Type
-  case class TyVar(name:String) extends Type
+  def find(s:String, env:TypeEnv): Type =
+    env.find(_._1 == s).map(p => success(p._2)).getOrElse(sys.error("not found: " + s))
 
-  type TypeEnv = Map[String, Type]
-
-  val numT  = TyCon("Num", Nil)
-  val boolT = TyCon("Bool", Nil)
-
-  def litToTy(l:Literal): Type = l match {
-    case Num(_) => numT
-    case Bool(_) => boolT
-  }
-
-  val predef: TypeEnv = Map(
-    "+"   -> (TyLam(numT,  TyLam(numT, numT))),
-    "-"   -> (TyLam(numT,  TyLam(numT, numT))),
-    "=="  -> (TyLam(numT,  TyLam(numT, boolT))),
-    "and" -> (TyLam(boolT, TyLam(boolT, boolT))),
-    "or"  -> (TyLam(boolT, TyLam(boolT, boolT)))
-    // TODO: how do we do if? is it like this?
-    //"if" ->  (TyLam(boolT,  .. ....  Set("a"))
-    //  tv => "if" -> (TyLam(boolT, TyLam(tv, TyLam(tv, tv))), Set())
-  )
+  def compare(t1: Type, t2: Type, resultType: Type, errorMsg: String): Type =
+    if(t1 == t2) success(resultType) else typeError(errorMsg)
 
   // the real type check function, which works with the type environment.
   def typeCheck(expr: Exp, env: TypeEnv=predef): Type = expr match {
     case Lit(v) => litToTy(v)
-    case Id(x) => env.find(_._1 == x).map(_._2).getOrElse(sys.error("not found: " + x))
-    case If(tst, texp, fexp) => typeCheck(tst, env) match {
-      // make sure the first branch is a boolean
-      case t if t == boolT =>
-        // make sure the second and third branches have the same type
-        // if so, return that type. if not, bomb.
-        (typeCheck(texp, env), typeCheck(fexp, env)) match {
-          case (lt, rt) if lt == rt => lt
-          case (lt, rt) => sys.error("error: if branches not the same type, got: " + (lt, rt))
-        }
-      case t => sys.error("error: if required bool in test position, but got: " + t)
-    }
-    case Fun(arg, argType, body) => TyLam(argType, typeCheck(body, env + (arg -> argType)))
-    case App(operator, operand) => typeCheck(operator, env) match {
-      // make sure the first argument to function application is indeed a function
+    case Id(x) => find(x, env)
+    // make sure the first branch is a boolean
+    // make sure the second and third branches have the same type
+    // if so, return that type. if not, bomb.
+    case If(tst, texp, fexp) =>
+      val t  = typeCheck(tst, env)
+      compare(t, boolT, boolT, "error: if required bool in test position, but got: " + t)
+      val lt = typeCheck(texp, env)
+      val rt = typeCheck(fexp, env)
+      compare(lt, rt, lt, "error: if branches not the same type, got: " + (lt, rt))
+    case Fun(arg, argType, body) =>
+      val t = typeCheck(body, env + (arg -> argType))
+      TyLam(argType, t)
+    // make sure the first argument to function application is indeed a function
+    // then make sure that the arguments match the explicit declarations
+    case App(operator, operand) =>
+      val operatorType = typeCheck(operator, env)
+      val operandType  = typeCheck(operand,  env)
+      operatorType match {
       case TyLam(argType, resultType) =>
-        // then make sure that the arguments match the explicit declarations
-        val operandType = typeCheck(operand, env)
-        if(argType == operandType) resultType
-        else sys.error("function expected arg of type: " + argType + ", but got: " + operandType)
-      case t => sys.error("function application expected function, but got: " + t)
+        compare(argType, operandType, resultType,
+          "function expected arg of type: " + argType + ", but got: " + operandType)
+      case t => typeError("function application expected function, but got: " + t)
     }
   }
 }
