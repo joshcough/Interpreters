@@ -10,7 +10,7 @@ object TypeCheckerWithInference_MonadTransformers {
 
   import scalaz.State._
   import scalaz.std.list.{listInstance => listTraverse}
-  import scalaz.{StateT, State, EitherT}
+  import scalaz.{State, EitherT}
   import EitherT._
   import scalaz.std.either._
   import scalaz.syntax.monad._
