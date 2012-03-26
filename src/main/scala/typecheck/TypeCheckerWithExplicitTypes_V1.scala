@@ -1,50 +1,16 @@
 package typecheck
 
 /**
- * I'm writing this to explore type checking in Scala.
+ * This code served as an original reference implementation, but I decided
+ * to go in a different direction with it.
  *
- * To do this, I'm starting with a very simple language that allows only one top level expression.
+ * This implementation hardcodes the all functions into the language
+ * (add, sub, eql, etc), instead of allowing them to be added to the
+ * type environment passed to the type checker. That approach allows
+ * for more flexibility in the language.
  *
- * The language has three types: Int, Bool, and Arrow (List T) T
- * and corresponding literals for those types (shown in examples below).
- *
- * There are four built-in functions:
- *   if  : (Bool -> T -> T) -> T
- *   add : (Int  -> Int) -> Int
- *   sub : (Int  -> Int) -> Int
- *   eql : (Int  -> Int) -> Bool
- *
- * The user is required to put explicit type declarations on all function arguments.
- * It does not however, require that the function return type be annotated.
- * This *could* be required - and it would require some additional
- * type checking for functions. But in this case, it simply isn't necessary.
- * The return type of a function is simply the type of its body (as long as
- * the body type checks properly, of course).
- *
- * Functions in this language cannot be curried, they must be applied to all of their arguments.
- *
- * There is no concrete syntax for the language, only abstract. But, you easily imagine possible examples:
- *
- * Here, we create a function that takes two Ints and simply adds them.
- * We then apply that function to 7 and 8.
- *
- * ((fun (x:Int, y:Int) (add x y)) 7 8)
- *
- * Here is an example of 'not': (fun (x: Bool) (if x false true))
- *
- * The type checker pretty much just makes sure that the actual types line up
- * with the for the built-ins, and that the arguments passed to a function line up with
- * the explicit function argument annotations.
- *
- * So far, this is nothing fancy. But it gives us a framework for starting to explore other features like:
- *   type inference
- *   partial application
- *   new data types
- *   higher kinded types
- *   type classes
- *
- * We also have the opportunity later to refactor the type checker to a monadic style in
- * an effort to explore monads and monad transformers.
+ * The new code that implements that approach is in TypeCheckerWithExplicitTypes,
+ * that is the best place to start.
  */
 object TypeCheckerWithExplicitTypes_V1 {
 
