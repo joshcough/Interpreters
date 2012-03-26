@@ -1,5 +1,9 @@
 package typecheck
 
+import scalaz.State
+import scalaz.State._
+import scalaz.std.list.{listInstance => listTraverse}
+
 /**
  * Note: A lot of this code is a port from:
  *   http://fsharpcode.blogspot.com/2010/08/hindley-milner-type-inference-sample.html
@@ -57,7 +61,7 @@ object TypeCheckerWithInference {
 
   type Subst = Map[String, Type]
   def extend(v:String, t:Type, subs: Subst): Subst = subs + (v -> t)
-  def lookup(v:String, subs:Subst) = subs.getOrElse(v, TyVar(v))
+  def lookup(v:String, subs:Subst): Type = subs.getOrElse(v, TyVar(v))
   def subs(t:Type, s:Subst): Type = t match {
     case TyVar(n) =>
       val tp = lookup(n, s)
@@ -102,64 +106,64 @@ object TypeCheckerWithInference {
 
   // Calculate the principal type scheme for an expression in a given
   // typing environment
-  def tp(env: Env, exp: Exp, bt: Type, s: Subst): Subst = exp match {
-    case Lit(v) => mgu(litToTy(v), bt, s)
-    case Var(n) => env.get(n).map{
-      case (t,_) => mgu(subs(t, s), bt, s)
-    }.getOrElse(sys.error("unknown id: " + n))
-    case Lam(x, e) =>
-      val a = newTypVar()
-      val b = newTypVar()
-      tp(env + (x -> (a, Set())), e, b, mgu(bt, TyLam(a, b), s))
-    case App(e1, e2) =>
-      val a = newTypVar()
-      tp(env, e2, a, tp(env, e1, TyLam(a, bt), s))
+  def tp(env: Env, exp: Exp, bt: Type, s: Subst): State[Int, Subst] = {
+    def newTypVar = for(n <- modify[Int](_ + 1)) yield TyVar("t" + n)
+    exp match {
+      case Lit(v) => state(mgu(litToTy(v), bt, s))
+      case Var(n) => state(env.get(n).map{
+        case (t,_) => mgu(subs(t, s), bt, s)
+      }.getOrElse(sys.error("unknown id: " + n)))
+      case Lam(x, e) => for {
+        a <- newTypVar
+        b <- newTypVar
+        t <- tp(env + (x -> (a, Set())), e, b, mgu(bt, TyLam(a, b), s))
+      } yield t
+      case App(e1, e2) => for{
+        a    <- newTypVar
+        funT <- tp(env, e1, TyLam(a, bt), s)
+        resT <- tp(env, e2, a, funT)
+      } yield resT
+    }
   }
 
-  var ts = Iterator.from(0)
-  def resetTypCounter() = ts = Iterator.from(0)
-  def newTypVar() = TyVar("t" + ts.next())
-
-  val numCon = TyCon("Num", Nil)
+  val numCon  = TyCon("Num", Nil)
   val boolCon = TyCon("Bool", Nil)
 
   def litToTy(l:Literal): Type = l match {
-    case Num(_) => numCon
+    case Num(_)  => numCon
     case Bool(_) => boolCon
   }
 
   val predef: Env = Map(
-    "+" ->   (TyLam(numCon, TyLam(numCon, numCon)), Set()),
-    "-" ->   (TyLam(numCon, TyLam(numCon, numCon)), Set()),
-    "==" ->  (TyLam(numCon, TyLam(numCon, boolCon)), Set()),
+    "+"   -> (TyLam(numCon,  TyLam(numCon, numCon)),   Set()),
+    "-"   -> (TyLam(numCon,  TyLam(numCon, numCon)),   Set()),
+    "=="  -> (TyLam(numCon,  TyLam(numCon, boolCon)),  Set()),
     "and" -> (TyLam(boolCon, TyLam(boolCon, boolCon)), Set()),
-    "or" ->  (TyLam(boolCon, TyLam(boolCon, boolCon)), Set())
+    "or"  -> (TyLam(boolCon, TyLam(boolCon, boolCon)), Set())
     // TODO: how do we do if? is it like this?
     //  tv => "if" -> (TyLam(boolCon, TyLam(tv, TyLam(tv, tv))), Set())
   )
 
+  // rename all the type variables starting from t0
+  // this cleans things up a bit as far as presentation goes.
+  def renameTyVars(t:Type): Type = {
+    type R = (Int, Map[String, String])
+    def update(k: String, r: R) =
+      if(r._2.contains(k)) r else (r._1 + 1, r._2 + (k -> ("t" + r._1)))
+    def helper(t:Type): State[R, Type] = t match {
+      case TyVar(oldName) =>
+        for { z <- modify[R](update(oldName, _)) } yield TyVar(z._2(oldName))
+      case TyLam(a, b) =>
+        for { t1 <- helper(a); t2 <- helper(b) } yield TyLam(t1, t2)
+      case TyCon(name, tyArgs) =>
+        for { ts <- listTraverse.traverseS(tyArgs)(helper(_)) } yield TyCon(name, ts)
+    }
+    helper(t)((0, Map[String, String]()))._1
+  }
+
   // the top level type check function
   def typeCheck(exp: Exp): Type = {
-    resetTypCounter()
-    val a = TyVar("init")
-    val s1: Subst = tp(predef, exp, a, Map())
-
-    // rename all the type variables starting from t0
-    // this cleans things up a bit as far as presentation goes.
-    def renameTyVars(t:Type): Type = {
-      val count = Iterator.from(0)
-      val m = collection.mutable.Map[String, String]()
-      def renameTyVarsHelper(t:Type): Type = t match {
-        case TyVar(oldName) => TyVar(m.getOrElseUpdate(oldName, {
-          val newName = "t" + count.next()
-          m += (oldName -> newName)
-          newName
-        }))
-        case TyLam(a, b) => TyLam(renameTyVarsHelper(a), renameTyVarsHelper(b))
-        case TyCon(name, tyArgs) => TyCon(name, tyArgs.map(renameTyVarsHelper(_)))
-      }
-      renameTyVarsHelper(t)
-    }
-    renameTyVars(subs(a, s1))
+    val a  = TyVar("init")
+    renameTyVars(subs(a, tp(predef, exp, a, Map())(0)._1))
   }
 }
