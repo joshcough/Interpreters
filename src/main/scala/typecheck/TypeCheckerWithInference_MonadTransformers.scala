@@ -78,7 +78,6 @@ object TypeCheckerWithInference_MonadTransformers {
   type Env = Map[String, TyScheme]
   // TODO: TyScheme is used for Let, which I haven't done yet.
   // This implementation could just have type Env = Map[String, Type]
-
   def getTVarsOfType(t: Type): Set[String] = t match {
     case TyVar(n) => Set(n)
     case TyLam(t1, t2) => getTVarsOfType(t1) ++ getTVarsOfType(t2)
@@ -188,6 +187,9 @@ object TypeCheckerWithInference_MonadTransformers {
     tp(predef, exp, a, Map()).run(0)._1.right.map(s => renameTyVars(subs(a, s)))
   }
 }
+
+
+// Lots of failed attempts that might be useful in explaining thought process:
 
 
 //    def r(a:Type, b: Type, x: String, e: Exp, ss: Either[String, Subst]):
