@@ -1,8 +1,16 @@
 package typecheck
 
 /**
- * Note: A lot of this code is a port from:
+ * Notes:
+ *
+ * A lot of this code is a port from:
  *   http://fsharpcode.blogspot.com/2010/08/hindley-milner-type-inference-sample.html
+ *
+ * The monad transformation stuff is inspired by:
+ *   http://www.grabmueller.de/martin/www/pub/Transformers.pdf
+ *
+ * Robby Findler's lecture notes on type inference can be found here:
+ *   http://www.eecs.northwestern.edu/~robby/courses/321-2012-winter/lecture16.pdf
  */
 object TypeCheckerWithInference_MonadTransformers {
 
@@ -28,8 +36,8 @@ object TypeCheckerWithInference_MonadTransformers {
         success(extend(ta, b, s))
       case (_, TyVar(_)) => mgu(b, a, s)
       case (TyLam(a1, b1), TyLam(a2, b2)) => for {
-        s1: Subst <- mgu(b1, b2, s)
-        s2: Subst <- mgu(a1, a2, s1)
+        s1 <- mgu(b1, b2, s)
+        s2 <- mgu(a1, a2, s1)
       } yield s2
       case (TyCon(name1, args1), TyCon(name2, args2)) if name1 == name2 =>
         // TODO: find out if there is a nicer way to do this...
@@ -64,14 +72,14 @@ object TypeCheckerWithInference_MonadTransformers {
         case (t, _) => mgu(subs(t, s), bt, s)
       }.getOrElse(Left("unknown id: " + n)))
       case Lam(x, e) => for {
-        a <- newTypVar
-        b <- newTypVar
-        s1 <- liftES(mgu(bt, TyLam(a, b), s))
+        a   <- newTypVar
+        b   <- newTypVar
+        s1  <- liftES(mgu(bt, TyLam(a, b), s))
         res <- tp(env + (x ->(a, Set())), e, b, s1)
       } yield res
       case App(e1, e2) => for {
-        a <- newTypVar
-        f <- tp(env, e1, TyLam(a, bt), s)
+        a   <- newTypVar
+        f   <- tp(env, e1, TyLam(a, bt), s)
         res <- tp(env, e2, a, f)
       } yield res
     }

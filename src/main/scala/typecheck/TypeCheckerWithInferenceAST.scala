@@ -25,9 +25,7 @@ object TypeCheckerWithInferenceAST {
   def extend(v:String, t:Type, subs: Subst): Subst = subs + (v -> t)
   def lookup(v:String, subs:Subst) = subs.getOrElse(v, TyVar(v))
   def subs(t:Type, s:Subst): Type = t match {
-    case TyVar(n) =>
-      val tp = lookup(n, s)
-      if(t == tp) tp else subs(tp, s)
+    case TyVar(n)    => if(t == lookup(n, s)) t else subs(lookup(n, s), s)
     case TyLam(a, r) => TyLam(subs(a, s), subs(r, s))
     case TyCon(name, tyArgs) => TyCon(name, tyArgs.map(subs(_, s)))
   }
@@ -39,26 +37,27 @@ object TypeCheckerWithInferenceAST {
   // This implementation could just have type Env = Map[String, Type]
 
   def getTVarsOfType(t:Type): Set[String] = t match {
-    case TyVar(n) => Set(n)
-    case TyLam(t1, t2) => getTVarsOfType(t1) ++ getTVarsOfType(t2)
+    case TyVar(n)       => Set(n)
+    case TyLam(t1, t2)  => getTVarsOfType(t1) ++ getTVarsOfType(t2)
     case TyCon(_, args) => args.flatMap(t => getTVarsOfType(t)).toSet
   }
 
-  val numCon = TyCon("Num", Nil)
+  val numCon  = TyCon("Num",  Nil)
   val boolCon = TyCon("Bool", Nil)
 
   def litToTy(l:Literal): Type = l match {
-    case Num(_) => numCon
+    case Num(_)  => numCon
     case Bool(_) => boolCon
   }
 
   val predef: Env = Map(
-    "+" ->   (TyLam(numCon, TyLam(numCon, numCon)), Set()),
-    "-" ->   (TyLam(numCon, TyLam(numCon, numCon)), Set()),
-    "==" ->  (TyLam(numCon, TyLam(numCon, boolCon)), Set()),
+    "+"   -> (TyLam(numCon, TyLam(numCon, numCon)), Set()),
+    "-"   -> (TyLam(numCon, TyLam(numCon, numCon)), Set()),
+    "=="  -> (TyLam(numCon, TyLam(numCon, boolCon)), Set()),
     "and" -> (TyLam(boolCon, TyLam(boolCon, boolCon)), Set()),
-    "or" ->  (TyLam(boolCon, TyLam(boolCon, boolCon)), Set())
+    "or"  -> (TyLam(boolCon, TyLam(boolCon, boolCon)), Set())
     // TODO: how do we do if? is it like this?
     //  tv => "if" -> (TyLam(boolCon, TyLam(tv, TyLam(tv, tv))), Set())
+    // we need to use the type scheme for it somehow. things to learn.
   )
 }
