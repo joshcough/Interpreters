@@ -50,9 +50,9 @@ object TypeCheckerWithInference_Monadic {
       } yield t
       case App(e1, e2) => for {
         a <- newTypVar
-        funT <- tp(env, e1, TyLam(a, bt), s)
-        resT <- tp(env, e2, a, funT)
-      } yield resT
+        f <- tp(env, e1, TyLam(a, bt), s)
+        t <- tp(env, e2, a, f)
+      } yield t
     }
   }
 
