@@ -67,8 +67,8 @@ object TypeCheckerWithInference_MonadTransformers {
     def newTypVar: ETSType = eitherT[S, String, Type]((for (n <- modify[Int](_ + 1)) yield
       TyVar("t" + n)).map(t => (Right(t): Either[String, Type])))
     exp match {
-      case Lit(v) => liftES(mgu(litToTy(v), bt, s))
-      case Var(n) => liftES(env.get(n).map {
+      case Lit(v)  => liftES(mgu(litToTy(v), bt, s))
+      case i@Id(n) => liftES(env.get(i).map {
         case (t, _) => mgu(subs(t, s), bt, s)
       }.getOrElse(Left("unknown id: " + n)))
       case Lam(x, e) => for {

@@ -59,8 +59,8 @@ object TypeCheckerWithInference {
   // Calculate the principal type scheme for an expression in a given
   // typing environment
   def tp(env: Env, exp: Exp, bt: Type, s: Subst): Subst = exp match {
-    case Lit(v) => mgu(litToTy(v), bt, s)
-    case Var(n) => env.get(n).map{
+    case Lit(v)  => mgu(litToTy(v), bt, s)
+    case i@Id(n) => env.get(i).map{
       case (t,_) => mgu(subs(t, s), bt, s)
     }.getOrElse(sys.error("unknown id: " + n))
     case Lam(x, e) =>

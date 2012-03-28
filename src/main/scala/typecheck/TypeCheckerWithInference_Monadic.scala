@@ -39,8 +39,8 @@ object TypeCheckerWithInference_Monadic {
   def tp(env: Env, exp: Exp, bt: Type, s: Subst): State[Int, Subst] = {
     def newTypVar = for (n <- modify[Int](_ + 1)) yield TyVar("t" + n)
     exp match {
-      case Lit(v) => state(mgu(litToTy(v), bt, s))
-      case Var(n) => state(env.get(n).map {
+      case Lit(v)  => state(mgu(litToTy(v), bt, s))
+      case i@Id(n) => state(env.get(i).map {
         case (t, _) => mgu(subs(t, s), bt, s)
       }.getOrElse(sys.error("unknown id: " + n)))
       case Lam(x, e) => for {

@@ -8,8 +8,8 @@ object TypeCheckerWithInferenceAST {
   case class Bool(b:Boolean) extends Literal
 
   trait Exp
-  case class Var(name:String) extends Exp
-  case class Lam(arg: String, body: Exp) extends Exp
+  case class Id(name:String) extends Exp
+  case class Lam(arg: Id, body: Exp) extends Exp
   case class App(f:Exp, arg: Exp) extends Exp
   case class Lit(l:Literal) extends Exp
   //  Let      of string * Exp * Exp   // local definition
@@ -32,7 +32,7 @@ object TypeCheckerWithInferenceAST {
 
   // Environments
   type TyScheme = (Type, Set[String])
-  type Env = Map[String, TyScheme]
+  type Env = Map[Id, TyScheme]
   // TODO: TyScheme is used for Let, which I haven't done yet.
   // This implementation could just have type Env = Map[String, Type]
 
@@ -51,11 +51,11 @@ object TypeCheckerWithInferenceAST {
   }
 
   val predef: Env = Map(
-    "+"   -> (TyLam(numCon, TyLam(numCon, numCon)), Set()),
-    "-"   -> (TyLam(numCon, TyLam(numCon, numCon)), Set()),
-    "=="  -> (TyLam(numCon, TyLam(numCon, boolCon)), Set()),
-    "and" -> (TyLam(boolCon, TyLam(boolCon, boolCon)), Set()),
-    "or"  -> (TyLam(boolCon, TyLam(boolCon, boolCon)), Set())
+    Id("+")   -> (TyLam(numCon, TyLam(numCon, numCon)), Set()),
+    Id("-")   -> (TyLam(numCon, TyLam(numCon, numCon)), Set()),
+    Id("==")  -> (TyLam(numCon, TyLam(numCon, boolCon)), Set()),
+    Id("and") -> (TyLam(boolCon, TyLam(boolCon, boolCon)), Set()),
+    Id("or")  -> (TyLam(boolCon, TyLam(boolCon, boolCon)), Set())
     // TODO: how do we do if? is it like this?
     //  tv => "if" -> (TyLam(boolCon, TyLam(tv, TyLam(tv, tv))), Set())
     // we need to use the type scheme for it somehow. things to learn.
