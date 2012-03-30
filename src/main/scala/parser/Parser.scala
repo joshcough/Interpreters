@@ -25,7 +25,7 @@ object Parser {
     def PROG: Parser[Either[String, Program]] = (EXPR+) ^^ { exps =>
       exps.init.find(! _.isInstanceOf[Lam]).map {
         e => Left("expected Lam, got: " + e)
-      }.getOrElse(Right(Program(exps.init.map(_.asInstanceOf[Lam]), exps.last)))
+      }.getOrElse(Right(Program(exps)))
     }
 
     def run(s:String): Either[String, Program] = parse(PROG, s) match {

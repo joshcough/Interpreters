@@ -20,7 +20,7 @@ object TypeCheckerWithInferenceAST {
   case class TyVar(name:String) extends Type
   case class TyCon(name:String, args: List[Type]) extends Type
 
-  case class Program(lams: List[Lam], exp: Exp)
+  case class Program(exps: List[Exp])
 
   // Subtitutions
   type Subst = Map[String, Type]
