@@ -202,13 +202,13 @@ object TypeCheckerWithInference_MonadTransformers {
 //        st1: State[Int, Type]  <- liftET(newTypVar)
 //        st2: State[Int, (Type, Type)]  <- liftET(for{ t1 <- st1; t2 <- newTypVar } yield (t1,t2))
 //        ss:  State[Int, Subst] <- liftET(for{ ab <- st2; x <- fromMgu(bt, TyLam(ab._1, ab._2)) } yield x)
-//        t <- fromMgu(boolCon, bt)
+//        t <- fromMgu(BoolT, bt)
 ////        t <- for { s1: Subst <- ss } yield tp(env + (x -> (a, Set())), e, b, s1)
 //      } yield t
 
 
 //        eitherTMonad(stateMonad).bind(newTypVar){ t =>
-//          liftES(mgu(boolCon, bt, s))
+//          liftES(mgu(BoolT, bt, s))
 //        }
 
 //        for {

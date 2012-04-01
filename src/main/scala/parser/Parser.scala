@@ -2,15 +2,11 @@ package parser
 
 import scala.util.parsing.combinator.RegexParsers
 import typecheck.TypeCheckerWithInferenceAST._
-import scalaz.EitherT._
-import scalaz.std.either._
-import scalaz.syntax.monad._
 
-// TODO: add a type parser.
 // TODO: the top level lambdas need to be defs, not just raw lambdas.
 object Parser {
 
-  object Inner extends RegexParsers {
+  object ExpressionParser extends RegexParsers {
     def parens[T](p:Parser[T]):Parser[T] = "(" ~> p <~ ")"
 
     val NUM  = """[1-9][0-9]*""".r      ^^ { s => Lit(Num (s.toInt)) }
@@ -44,21 +40,26 @@ object Parser {
     }
   }
 
-  def parse(s:String): Either[String, Program] = Inner.run(s)
-
-  // tests for parsing this stuff
-  // TODO: put these in a real test.
-  def main(args:Array[String]) {
-    def doParse(s:String) = parse(s) match {
-      case Left(err) => sys.error(err)
-      case Right(p)  => println(p)
+  object TypeParser extends RegexParsers {
+    def parens[T](p:Parser[T]):Parser[T] = "(" ~> p <~ ")"
+    val INTT   = "Int".r ^^ { _ => IntT }
+    val BOOLT  = "Bool".r ^^ { _ => BoolT }
+    val TYVAR  = """'[a-z]([0-9])*""".r ^^ { s => TyVar(s.drop(1)) }
+    //('t0 -> 't1) -> ('t1 -> 't2) -> 't0 -> 't2"
+    //(('t1 -> 't2) -> 't1 -> 't2) -> 't2
+    def TYLAM  = ((INTT | BOOLT | TYVAR) ~ "->" ~ TYPE) ^^ { case in ~ "->" ~ out => TyLam(in, out) }
+    def TYLAM_PARENS: Parser[TyLam] = parens(TYLAM | TYLAM_PARENS) ~ opt("->" ~> TYPE) ^^ {
+      case in ~ maybeOut => maybeOut.map(TyLam(in, _)).getOrElse(in)
     }
-    doParse("(x -> x) 7")
-    doParse("(x -> x) (x -> x)")
-    doParse("(x -> x) (x -> x)(x -> x)")
-    doParse("6")
-    doParse("( x -> x )")
-    doParse("(x->x)")
-    doParse("(x x)")
+
+
+    def TYPE: Parser[Type] = TYLAM_PARENS | TYLAM | INTT | BOOLT | TYVAR
+    def run(s:String): Either[String, Type] = parse(TYPE, s) match {
+      case Success(result, _) => Right(result)
+      case f@Failure(msg, _)  => Left(msg)
+    }
   }
+
+  def parse(s:String): Either[String, Program] = ExpressionParser.run(s)
+  def parseType(s:String): Either[String, Type] = TypeParser.run(s)
 }

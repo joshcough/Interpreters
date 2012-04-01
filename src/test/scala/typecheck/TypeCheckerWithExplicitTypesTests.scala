@@ -2,17 +2,8 @@ package typecheck
 
 import TypeCheckerWithExplicitTypes_V1._
 
-import org.scalacheck.Prop._
-import org.scalacheck.Properties
-
-object TypeCheckerWithExplicitTypesTests extends Properties("TypeCheckerWithExplicitTypes"){
-  def typeCheck(exp:Tree, expected:Type, env:TypeEnv = Nil) = {
-    property(exp.toString) = secure {
-      val result = TypeCheckerWithExplicitTypes_V1.typeCheck(exp, env)
-      if(result != expected) println("expected: " + expected + ", got: " + result)
-      result == expected
-    }
-  }
+object TypeCheckerWithExplicitTypesTests extends
+  org.scalacheck.Properties("TypeCheckerWithExplicitTypes") with util.Compare {
 
   typeCheck(Num(7), NumT)
   typeCheck(Bool(true), BoolT)
@@ -124,4 +115,7 @@ object TypeCheckerWithExplicitTypesTests extends Properties("TypeCheckerWithExpl
   (type-check-expr (ifthenelse (eql (bool #t)Num(8)) Num(8)Num(9)))
   "eql: type-error expected: NumT in position 1, but found: (boolT)")
   */
+
+  def typeCheck(exp:Tree, expected:Type, env:TypeEnv = Nil) =
+    compare(exp.toString, TypeCheckerWithExplicitTypes_V1.typeCheck(exp, env), expected)
 }

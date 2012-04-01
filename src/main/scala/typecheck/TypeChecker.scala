@@ -86,16 +86,11 @@ object TypeChecker {
       modState(t => t.copy(env = t.env + (id -> scheme))).map(t => (Right(t.env): Either[String, Env]))
     )
   def updateSubst(f: Subst => ETS[Subst]): ETS[Subst] = {
-    //def setSubst(newSubst: Subst) = modState(t => t.copy(subst = newSubst))
     def setSubst(newSubst: Subst) =
       eitherT[S, String, Subst](
         modState(t => t.copy(subst = newSubst)).map(t => (Right(t.subst): Either[String, Subst]))
       )
-    for {
-      s  <- getSubst
-      s1 <- f(s)
-      _  <- setSubst(s1)
-    } yield s1
+    for { s  <- getSubst; s1 <- f(s); _  <- setSubst(s1) } yield s1
   }
 
   /**
@@ -147,13 +142,8 @@ object TypeChecker {
   def typeCheck(exp: Exp): Either[String, Type] = {
     val a = TyVar("init")
     val as = tp(exp, a).run(TypeCheckState(0, predef, Map()))
-//    println(as)
     as._1.right.map(s => renameTyVars(subs(a, s)))
   }
-
-//  typeCheck(App(App(Id("=="), Lit(Num(7))), Lit(Num(8))), boolCon)
-
-
 
   // i need to take each of my expressions and its type variable
   // and run that through tp. this will give back an

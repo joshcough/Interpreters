@@ -15,9 +15,12 @@ object TypeCheckerWithInferenceAST {
   //  Let      of string * Exp * Exp   // local definition
 
   // Type Tree
-  trait Type
+  sealed trait Type
   case class TyLam(f:Type, arg:Type) extends Type {
-    override def toString = f.toString + " -> " + arg.toString
+    override def toString = (f match {
+      case t@TyLam(_, _) => "(" + t.toString + ")"
+      case _ => f.toString
+    }) + " -> " + arg.toString
   }
   case class TyVar(name:String) extends Type {
     override def toString = "'" + name
@@ -50,24 +53,24 @@ object TypeCheckerWithInferenceAST {
     case TyCon(_, args) => args.flatMap(t => getTVarsOfType(t)).toSet
   }
 
-  val numCon  = TyCon("Num",  Nil)
-  val boolCon = TyCon("Bool", Nil)
+  val IntT  = TyCon("Int",  Nil)
+  val BoolT = TyCon("Bool", Nil)
 
   def litToTy(l:Literal): Type = l match {
-    case Num(_)  => numCon
-    case Bool(_) => boolCon
+    case Num(_)  => IntT
+    case Bool(_) => BoolT
   }
 
   val predef: Env = Map(
     // TODO: notice that identity is not polymorphic.
-    Id("identity") -> (TyLam(numCon, numCon), Set()),
-    Id("+")   -> (TyLam(numCon, TyLam(numCon, numCon)), Set()),
-    Id("-")   -> (TyLam(numCon, TyLam(numCon, numCon)), Set()),
-    Id("==")  -> (TyLam(numCon, TyLam(numCon, boolCon)), Set()),
-    Id("and") -> (TyLam(boolCon, TyLam(boolCon, boolCon)), Set()),
-    Id("or")  -> (TyLam(boolCon, TyLam(boolCon, boolCon)), Set())
+    Id("identity") -> (TyLam(IntT, IntT), Set()),
+    Id("+")   -> (TyLam(IntT, TyLam(IntT, IntT)), Set()),
+    Id("-")   -> (TyLam(IntT, TyLam(IntT, IntT)), Set()),
+    Id("==")  -> (TyLam(IntT, TyLam(IntT, BoolT)), Set()),
+    Id("and") -> (TyLam(BoolT, TyLam(BoolT, BoolT)), Set()),
+    Id("or")  -> (TyLam(BoolT, TyLam(BoolT, BoolT)), Set())
     // TODO: how do we do if? is it like this?
-    //  tv => "if" -> (TyLam(boolCon, TyLam(tv, TyLam(tv, tv))), Set())
+    //  tv => "if" -> (TyLam(BoolT, TyLam(tv, TyLam(tv, tv))), Set())
     // we need to use the type scheme for it somehow. things to learn.
   )
 }
