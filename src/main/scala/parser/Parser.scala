@@ -9,10 +9,9 @@ object Parser {
   object ExpressionParser extends RegexParsers {
     def parens[T](p:Parser[T]):Parser[T] = "(" ~> p <~ ")"
 
-    val NUM  = """[1-9][0-9]*""".r      ^^ { s => Lit(Num (s.toInt)) }
-    val BOOL = ("true" | "false")       ^^ { s => Lit(Bool(s.toBoolean)) }
-    // TODO: allow ' (prime)... ex: x'
-    val ID   = """[a-zA-Z]([a-zA-Z0-9]|_[a-zA-Z0-9])*""".r ^^ { s => Id(s) }
+    val NUM  = """[1-9][0-9]*""".r  ^^ { s => Lit(Num (s.toInt)) }
+    val BOOL = ("true" | "false")   ^^ { s => Lit(Bool(s.toBoolean)) }
+    val ID   = """[a-zA-Z]([a-zA-Z0-9]|_[a-zA-Z0-9]|')*""".r ^^ { s => Id(s) }
     // TODO: these are kind of bogus...figure out a better way.
     val OP   = ("+" | "-" | "*" | "/" | "==")  ^^ { s => Id(s) }
     //(x y z -> (+ (+ x y) z)) = (x -> (y -> (z -> (+ (+ x y) z))))
@@ -20,7 +19,7 @@ object Parser {
       ids.init.foldRight(Lam(ids.last, exp)){ case (nextId, fun) => Lam(nextId, fun) }
     }
     //(f a b c d) = ((((f a) b) c) d)
-    def APP  = parens(EXPR ~ (EXPR+))     ^^ { case f ~ args =>
+    def APP  = parens(EXPR ~ (EXPR+)) ^^ { case f ~ args =>
       args.tail.foldLeft(App(f, args.head)){ case (fun, nextArg) => App(fun, nextArg)}
     }
     def EXPR: Parser[Exp] = BOOL | NUM  | ID | OP | LAM | APP
@@ -51,8 +50,6 @@ object Parser {
     def TYLAM_PARENS: Parser[TyLam] = parens(TYLAM | TYLAM_PARENS) ~ opt("->" ~> TYPE) ^^ {
       case in ~ maybeOut => maybeOut.map(TyLam(in, _)).getOrElse(in)
     }
-
-
     def TYPE: Parser[Type] = TYLAM_PARENS | TYLAM | INTT | BOOLT | TYVAR
     def run(s:String): Either[String, Type] = parse(TYPE, s) match {
       case Success(result, _) => Right(result)

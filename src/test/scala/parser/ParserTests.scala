@@ -11,6 +11,7 @@ object TypeParserTests  extends org.scalacheck.Properties("Type Parser") with ut
   parseType("'t0 -> Bool")
   parseType("('t0 -> 't1) -> ('t1 -> 't2) -> 't0 -> 't2")
   parseType("(('t1 -> 't2) -> 't1 -> 't2) -> 't2")
+  parseType("('t1 -> ('t2 -> 't1) -> 't2) -> 't2")
 
   def parseType(typeString: String, expectedTypeString:Option[String]=None) = compare(
     typeString,
@@ -30,6 +31,9 @@ object ExpressionParserTests  extends org.scalacheck.Properties("Expression Pars
   parseExp("( x -> x )", Lam(Id("x"), Id("x")))
   parseExp("(x->x)", Lam(Id("x"), Id("x")))
   parseExp("(x x)", App(Id("x"),Id("x")))
+  parseExp("(x x')", App(Id("x"),Id("x'")))
+  parseExp("(x x'')", App(Id("x"),Id("x''")))
+  parseExp("(x x'p')", App(Id("x"),Id("x'p'")))
 
   def parseExp(code: String, expectedProgram:Exp*) =
     compare(code, Parser.parse(code), Right(Program(expectedProgram.toList)))
