@@ -64,7 +64,10 @@ object TypeChecker {
   type S[T] = State[TypeCheckState, T]
   type ETS[T] = EitherT[S, String, T]
 
+  //
   // get things out of the state
+  //
+
   def mapState[T](f: TypeCheckState => T) =
     eitherT[S, String, T](for(t <- init.map(f)) yield Right(t) : Either[String, T])
   def getEnv   = mapState(_.env)
@@ -74,22 +77,25 @@ object TypeChecker {
     case (t, _) => mgu(subs(t, s), bt, s)
   }.getOrElse(typeError("unknown id: " + id.name))
 
+  //
   // update things in the state
-  // TODO: all this eitherT crap really needs cleaning up.
+  //
+
   def modState(f: TypeCheckState => TypeCheckState) = modify[TypeCheckState](f)
-  def newTypVar: ETS[Type] = {
-    val next = for (n <- modState(t => t.copy(t.tyVarCount + 1))) yield TyVar("t" + n.tyVarCount)
-    eitherT[S, String, Type](next.map(t => (Right(t): Either[String, Type])))
-  }
+  def liftS[T](s:State[TypeCheckState,T]) =
+    eitherT[S, String, T](s.map{ t => Right(t): Either[String, T] })
+  // get a fresh type variable, incrementing the count in the state in the process.
+  def newTypVar: ETS[Type] =
+    liftS(for (n <- modState(t => t.copy(t.tyVarCount + 1))) yield TyVar("t" + n.tyVarCount))
+  // update the environment in the state
   def updateEnv(id:Id, scheme:TyScheme): ETS[Env] =
-    eitherT[S, String, Env](
-      modState(t => t.copy(env = t.env + (id -> scheme))).map(t => (Right(t.env): Either[String, Env]))
-    )
+    liftS(modState(t => t.copy(env = t.env + (id -> scheme))).map(_.env))
+  // run a function that produces a new subst
+  // and update the state with that new subst afterwards
   def updateSubst(f: Subst => ETS[Subst]): ETS[Subst] = {
-    def setSubst(newSubst: Subst) =
-      eitherT[S, String, Subst](
-        modState(t => t.copy(subst = newSubst)).map(t => (Right(t.subst): Either[String, Subst]))
-      )
+    // change the subst in the state
+    def setSubst(newSubst: Subst): ETS[Subst] =
+      liftS(modState(t => t.copy(subst = newSubst)).map(_.subst))
     for { s  <- getSubst; s1 <- f(s); _  <- setSubst(s1) } yield s1
   }
 
@@ -145,23 +151,25 @@ object TypeChecker {
     as._1.right.map(s => renameTyVars(subs(a, s)))
   }
 
-  // i need to take each of my expressions and its type variable
-  // and run that through tp. this will give back an
-  // EitherT[State[TypeCheckState, Subst], String, Subst]
-  // i think something is most definitely wrong with that type,
-  // but i'll come back to that later.
-  // the idea is to run them all, and get back a bunch of state objects,
-  // but im not sure how to do that yet.
-  // once i have the state objects, i can chain them all together.
-  // i was hoping to use sequence or traverse for this.
-
-  // anyway, i have enough info here to call tp on each of expsAndTypeVars.
-  // so that is a start.
+  /**
+    i need to take each of my expressions and its type variable
+    and run that through tp. this will give back an
+    EitherT[State[TypeCheckState, Subst], String, Subst]
+    i think something is most definitely wrong with that type,
+    but i'll come back to that later.
+    the idea is to run them all, and get back a bunch of state objects,
+    but im not sure how to do that yet.
+    once i have the state objects, i can chain them all together.
+    i was hoping to use sequence or traverse for this.
+    anyway, i have enough info here to call tp on each of expsAndTypeVars.
+    so that is a start.
+  **/
   def typeCheck(s:String): Either[String, Type] = for {
     p <- Parser.parse(s)
     //val _ = println(p)
     // make up frest type variables for each exp
-    val etv = p.exps.zip(Stream.from(0).map((i:Int) => TyVar("t" + i))).toList
+    val exps = p.defs.map(_.lam) ::: List(p.e)
+    val etv = exps.zip(Stream.from(0).map((i:Int) => TyVar("t" + i))).toList
     //val _ = println(etv)
     // TODO: i think there is a huge problem here...im not putting the new lambdas into the env.
     // TODO: additionally, i have no good way to name them. currently just by their params.

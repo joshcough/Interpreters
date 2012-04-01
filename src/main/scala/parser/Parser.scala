@@ -24,17 +24,15 @@ object Parser {
     }
     def EXPR: Parser[Exp] = BOOL | NUM  | ID | OP | LAM | APP
 
+    def DEF: Parser[Def] = parens("def" ~> ID ~ LAM) ^^ { case id ~ lam => Def(id, lam) }
+    
     // this is terrible, but whatever, it works for now
     // it allows for a bunch of top level lambdas, and then a final expression.
     // i wanted it to be simply LAM* | EXP, but it didnt work with only lambdas.
-    def PROG: Parser[Either[String, Program]] = (EXPR+) ^^ { exps =>
-      exps.init.find(! _.isInstanceOf[Lam]).map {
-        e => Left("expected Lam, got: " + e)
-      }.getOrElse(Right(Program(exps)))
-    }
+    def PROG: Parser[Program] = (DEF*) ~ EXPR ^^ { case defs ~ exp => Program(defs, exp) }
 
     def run(s:String): Either[String, Program] = parse(PROG, s) match {
-      case Success(result, _) => result
+      case Success(result, _) => Right(result)
       case f@Failure(msg, _)  => Left(msg)
     }
   }

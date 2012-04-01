@@ -29,7 +29,11 @@ object TypeCheckerWithInferenceAST {
     override def toString = name
   }
 
-  case class Program(exps: List[Exp])
+  case class Def(name:Id, lam:Lam)
+  object Program{
+    def apply(e:Exp): Program = Program(List(), e)
+  }
+  case class Program(defs: List[Def], e: Exp)
 
   // Subtitutions
   type Subst = Map[TyVar, Type]

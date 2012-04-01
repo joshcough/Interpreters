@@ -24,17 +24,20 @@ object ExpressionParserTests  extends org.scalacheck.Properties("Expression Pars
 
   import typecheck.TypeCheckerWithInferenceAST._
 
-  parseExp("(x -> x) 7", Lam(Id("x"), Id("x")), Lit(Num(7)))
-  parseExp("(x -> x) (x -> x)", Lam(Id("x"), Id("x")), Lam(Id("x"), Id("x")))
-  parseExp("(x -> x) (x -> x)(x -> x)", Lam(Id("x"), Id("x")), Lam(Id("x"), Id("x")), Lam(Id("x"), Id("x")))
-  parseExp("6", Lit(Num(6)))
-  parseExp("( x -> x )", Lam(Id("x"), Id("x")))
-  parseExp("(x->x)", Lam(Id("x"), Id("x")))
-  parseExp("(x x)", App(Id("x"),Id("x")))
-  parseExp("(x x')", App(Id("x"),Id("x'")))
-  parseExp("(x x'')", App(Id("x"),Id("x''")))
-  parseExp("(x x'p')", App(Id("x"),Id("x'p'")))
+  val id = Lam(Id("x"), Id("x"))
+  val idDef = Def(Id("id"), id)
+  
+  parseExp("(def id (x -> x)) 7", Program(List(idDef), Lit(Num(7))))
+  parseExp("(def id (x -> x)) (x -> x)", Program(List(idDef), id))
+  parseExp("(def id (x -> x)) (def id (x -> x)) (x -> x)", Program(List(idDef, idDef), id))
+  parseExp("6",          Program(Lit(Num(6))))
+  parseExp("( x -> x )", Program(id))
+  parseExp("(x->x)",     Program(id))
+  parseExp("(x x)",      Program(App(Id("x"),Id("x"))))
+  parseExp("(x x')",     Program(App(Id("x"),Id("x'"))))
+  parseExp("(x x'')",    Program(App(Id("x"),Id("x''"))))
+  parseExp("(x x'p')",   Program(App(Id("x"),Id("x'p'"))))
 
-  def parseExp(code: String, expectedProgram:Exp*) =
-    compare(code, Parser.parse(code), Right(Program(expectedProgram.toList)))
+  def parseExp(code: String, expected: Program) =
+    compare(code, Parser.parse(code), Right(expected))
 }
