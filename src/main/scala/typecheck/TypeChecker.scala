@@ -166,6 +166,15 @@ object TypeChecker {
   **/
   def typeCheck(s:String): Either[String, Type] = for {
     p <- Parser.parse(s)
+    t <- typeCheck(p)
+  } yield t
+
+  // TODO: not sure how its even possible to have a bare type here
+  // TODO: and not an Either. I think I do have an either, but I'm just
+  // TODO: pulling the subst from the state, and not checking to see
+  // TODO: if the result is a Left or Right.
+  // TODO: I should just use the subst from the result, not the state.
+  def typeCheck(p: Program): Either[String, Type] = {
     //val _ = println(p)
     // make up frest type variables for each exp
     val exps = p.defs.map(_.lam) ::: List(p.e)
@@ -176,9 +185,14 @@ object TypeChecker {
     // TODO: im going to have to make a top level def, instead of just lambda
     val state = listTraverse.sequenceS(etv.map{ case (e, tv) => tp(e, tv) }.map(_.run))
     //val _ = println(state)
+    // run everything with a base state.
     val r = state(TypeCheckState(etv.length, predef, Map()))
     //val _ = println(r)
     val mainTypeVar = etv.last._2
     val mainSubst = r._2.subst
-  } yield renameTyVars(subs(mainTypeVar, mainSubst))
+    val res = renameTyVars(subs(mainTypeVar, mainSubst))
+    Right(res)
+  }
+
+
 }
