@@ -41,12 +41,12 @@ object TypeCheckerWithInference_Monadic {
     exp match {
       case Lit(v)  => state(mgu(litToTy(v), bt, s))
       case i@Id(n) => state(env.get(i).map {
-        case (t, _) => mgu(subs(t, s), bt, s)
+        t => mgu(subs(t, s), bt, s)
       }.getOrElse(sys.error("unknown id: " + n)))
       case Lam(x, e) => for {
         a <- newTypVar
         b <- newTypVar
-        t <- tp(env + (x ->(a, Set())), e, b, mgu(bt, TyLam(a, b), s))
+        t <- tp(env + (x -> a), e, b, mgu(bt, TyLam(a, b), s))
       } yield t
       case App(e1, e2) => for {
         a <- newTypVar

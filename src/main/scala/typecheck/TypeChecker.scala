@@ -1,6 +1,7 @@
 package typecheck
 
 import parser.Parser
+import parser.Parser.{parse => _}
 
 /**
  * Notes:
@@ -27,11 +28,30 @@ object TypeChecker {
 
   // Unification
 
+  def freshen(t:TyForall): S[Type] = {
+    // TODO: UGH! This is duplicated. ok for now, just trying to get this to compile.
+    def newTV = for (n <- modState(t => t.copy(t.tyVarCount + 1))) yield TyVar("t" + n.tyVarCount)
+    for {
+      tvs <- listTraverse.sequenceS(t.tvs.map(_ => newTV))
+    } yield t.swapAll(tvs)
+  }
+  
   // Calculate the most general unifier of two types,
   // raising a UnificationError if there isn't one
-  def mgu(a: Type, b: Type, s: Subst): Either[String, Subst] = {
-//    println("calculating mgu for: " + (a, b, s))
-    val result = (subs(a, s), subs(b, s)) match {
+  def mgu(a: Type, b: Type, s: Subst): ETS[Subst] = {
+    //println("calculating mgu for: " + (a, b, s))
+    val sub1 = subs(a, s)
+    val sub2 = subs(b, s)
+    //println("(sub1, sub2) = " + (sub1, sub2))
+    (sub1, sub2) match {
+      case (tf@TyForall(_, _), t2) => for{
+        t  <- liftS(freshen(tf))
+        s1 <- mgu(t, t2, s)
+      } yield s1
+      case (t1, tf@TyForall(_, _)) => for{
+        t  <- liftS(freshen(tf))
+        s1 <- mgu(t1, t, s)
+      } yield s1
       case (TyVar(ta), TyVar(tb)) if ta == tb => success(s)
       // this does the 'occurs' check for infinite types.
       case (TyVar(ta), _) if (!getTVarsOfType(b).contains(ta)) =>
@@ -49,12 +69,10 @@ object TypeChecker {
         }
       case (x, y) => typeError("unable to unify: " +(x, y))
     }
-//    println("mgu = " + result)
-    result
   }
 
-  def success[T](t: T): Either[String, T] = Right(t)
-  def typeError(msg: String): Either[String, Subst] = Left(msg)
+  def success(s: Subst): ETS[Subst] = eitherT[S, String, Subst](state(Right(s)))
+  def typeError(msg: String): ETS[Subst] = eitherT[S, String, Subst](state(Left(msg)))
 
   /**
    * State related code
@@ -74,7 +92,7 @@ object TypeChecker {
   def getSubst = mapState(_.subst)
 
   def find(id: Id, e: Env, bt: Type, s: Subst) = e.get(id).map {
-    case (t, _) => mgu(subs(t, s), bt, s)
+    t => mgu(subs(t, s), bt, s)
   }.getOrElse(typeError("unknown id: " + id.name))
 
   //
@@ -88,8 +106,8 @@ object TypeChecker {
   def newTypVar: ETS[Type] =
     liftS(for (n <- modState(t => t.copy(t.tyVarCount + 1))) yield TyVar("t" + n.tyVarCount))
   // update the environment in the state
-  def updateEnv(id:Id, scheme:TyScheme): ETS[Env] =
-    liftS(modState(t => t.copy(env = t.env + (id -> scheme))).map(_.env))
+  def updateEnv(id:Id, s:Type): ETS[Env] =
+    liftS(modState(t => t.copy(env = t.env + (id -> s))).map(_.env))
   // run a function that produces a new subst
   // and update the state with that new subst afterwards
   def updateSubst(f: Subst => ETS[Subst]): ETS[Subst] = {
@@ -116,7 +134,7 @@ object TypeChecker {
         a <- newTypVar
         b <- newTypVar
         _ <- updateSubst(mgu(bt, TyLam(a, b), _))
-        _ <- updateEnv(x, (a, Set()))
+        _ <- updateEnv(x, a)
         s <- updateSubst(_ => tp (e, b))
       } yield s
       case App(e1, e2) => for {
@@ -140,6 +158,10 @@ object TypeChecker {
         for {t1 <- helper(a); t2 <- helper(b)} yield TyLam(t1, t2)
       case TyCon(name, tyArgs) =>
         for {ts <- listTraverse.traverseS(tyArgs)(helper(_))} yield TyCon(name, ts)
+      // TODO: come back and finish this later...
+      case tf@TyForall(tvs, t) => state(tf)
+//        val newTvs = listTraverse.sequenceS(tvs.map)
+//        for {ts <- listTraverse.traverseS(tyArgs)(helper(_))} yield TyCon(name, ts)
     }
     helper(t)((0, Map[String, String]()))._1
   }
@@ -183,16 +205,13 @@ object TypeChecker {
     // TODO: i think there is a huge problem here...im not putting the new lambdas into the env.
     // TODO: additionally, i have no good way to name them. currently just by their params.
     // TODO: im going to have to make a top level def, instead of just lambda
-    val state = listTraverse.sequenceS(etv.map{ case (e, tv) => tp(e, tv) }.map(_.run))
+    val s = listTraverse.sequenceS(etv.map{ case (e, tv) => tp(e, tv) }.map(_.run))
     //val _ = println(state)
     // run everything with a base state.
-    val r = state(TypeCheckState(etv.length, predef, Map()))
-    //val _ = println(r)
-    val mainTypeVar = etv.last._2
-    val mainSubst = r._2.subst
-    val res = renameTyVars(subs(mainTypeVar, mainSubst))
-    Right(res)
+    val r = s(TypeCheckState(etv.length, predef, Map()))
+
+    for{
+      subst <- r._1.last
+    } yield renameTyVars(subs(etv.last._2, subst))
   }
-
-
 }

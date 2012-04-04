@@ -69,13 +69,13 @@ object TypeCheckerWithInference_MonadTransformers {
     exp match {
       case Lit(v)  => liftES(mgu(litToTy(v), bt, s))
       case i@Id(n) => liftES(env.get(i).map {
-        case (t, _) => mgu(subs(t, s), bt, s)
+        t => mgu(subs(t, s), bt, s)
       }.getOrElse(Left("unknown id: " + n)))
       case Lam(x, e) => for {
         a   <- newTypVar
         b   <- newTypVar
         s1  <- liftES(mgu(bt, TyLam(a, b), s))
-        res <- tp(env + (x ->(a, Set())), e, b, s1)
+        res <- tp(env + (x -> a), e, b, s1)
       } yield res
       case App(e1, e2) => for {
         a   <- newTypVar

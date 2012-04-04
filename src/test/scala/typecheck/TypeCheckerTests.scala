@@ -20,6 +20,12 @@ object TypeCheckerTests extends org.scalacheck.Properties("TypeChecker") with ut
 
   // f = t0 -> t1, g = t1 -> t2, x = t0
   typeCheck("(f g x -> (g (f x)))", "('t0 -> 't1) -> ('t1 -> 't2) -> 't0 -> 't2")
+  typeCheck("(if true 5 6)", "Int")
+  typeCheck("if", "Bool -> 't0 -> 't0 -> 't0")
+  typeCheck("((identity if) (identity true) (identity 5) (identity 6))", "Int")
+
+// TODO: add tests for failures. here is one example:
+//  typeCheckFailure("(if true 5 true)", "Unable to unify (Int, Bool)")
 
   def typeCheck(code: String, expectedType:String) =
     compare (code, TypeChecker.typeCheck(code), parser.Parser.parseType(expectedType))

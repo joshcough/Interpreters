@@ -61,12 +61,12 @@ object TypeCheckerWithInference {
   def tp(env: Env, exp: Exp, bt: Type, s: Subst): Subst = exp match {
     case Lit(v)  => mgu(litToTy(v), bt, s)
     case i@Id(n) => env.get(i).map{
-      case (t,_) => mgu(subs(t, s), bt, s)
+      t => mgu(subs(t, s), bt, s)
     }.getOrElse(sys.error("unknown id: " + n))
     case Lam(x, e) =>
       val a = newTypVar()
       val b = newTypVar()
-      tp(env + (x -> (a, Set())), e, b, mgu(bt, TyLam(a, b), s))
+      tp(env + (x -> a), e, b, mgu(bt, TyLam(a, b), s))
     case App(e1, e2) =>
       val a = newTypVar()
       tp(env, e2, a, tp(env, e1, TyLam(a, bt), s))
