@@ -1,6 +1,4 @@
-package typecheck
-
-import parser.Parser
+package mf
 
 /**
  * Notes:
@@ -13,6 +11,8 @@ import parser.Parser
  *
  * Robby Findler's lecture notes on type inference can be found here:
  *   http://www.eecs.northwestern.edu/~robby/courses/321-2012-winter/lecture16.pdf
+ *
+ *   TODO: TypeChecker uses parser, but it probably shouldn't. It should just get the AST.
  */
 object TypeChecker {
 

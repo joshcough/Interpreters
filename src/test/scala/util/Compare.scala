@@ -9,6 +9,7 @@ trait Compare {
     property(testName) = secure {
       val a = actual
       val e = expected
+//      println("expected: " + e + ", got: " + a)
       if (a != e) println("expected: " + e + ", got: " + a)
       a == e
     }

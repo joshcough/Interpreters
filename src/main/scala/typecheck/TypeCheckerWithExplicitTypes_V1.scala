@@ -1,4 +1,4 @@
-package typecheck.demo
+package typecheck
 
 /**
  * This code served as an original reference implementation, but I decided

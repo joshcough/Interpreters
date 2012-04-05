@@ -1,4 +1,4 @@
-package typecheck
+package mf
 
 // TODO: make these tests run against all the type checkers, where possible.
 object TypeCheckerTests extends org.scalacheck.Properties("TypeChecker") with util.Compare {
@@ -22,7 +22,7 @@ object TypeCheckerTests extends org.scalacheck.Properties("TypeChecker") with ut
   typeCheck("(f g x -> (g (f x)))", "('t0 -> 't1) -> ('t1 -> 't2) -> 't0 -> 't2")
   typeCheck("(if true 5 6)", "Int")
   typeCheck("if", "Bool -> 't0 -> 't0 -> 't0")
-  typeCheck("((identity if) (identity true) (identity 5) (identity 6))", "Int")
+  typeCheck("((id if) (id true) (id 5) (id 6))", "Int")
 
 //  typeCheck("(Cons 5 (Cons 6 Nil))", "List Int")
 //  typeCheck("Nil", "List 't0")
@@ -31,5 +31,5 @@ object TypeCheckerTests extends org.scalacheck.Properties("TypeChecker") with ut
 //  typeCheckFailure("(if true 5 true)", "Unable to unify (Int, Bool)")
 
   def typeCheck(code: String, expectedType:String) =
-    compare (code, TypeChecker.typeCheck(code), parser.Parser.parseType(expectedType))
+    compare (code, TypeChecker.typeCheck(code), Parser.parseType(expectedType))
 }

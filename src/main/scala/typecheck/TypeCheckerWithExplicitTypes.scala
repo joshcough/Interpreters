@@ -1,4 +1,4 @@
-package typecheck.demo
+package typecheck
 
 /**
  * I'm writing this to explore type checking in Scala.
@@ -51,7 +51,6 @@ object TypeCheckerWithExplicitTypes {
   import TypeCheckerWithExplicitTypesAST._
 
   def success(t: Type) = t
-
   def typeError(msg: String) = sys.error(msg)
 
   def find(s: String, env: TypeEnv): Type =

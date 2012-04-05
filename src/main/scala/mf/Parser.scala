@@ -1,7 +1,7 @@
-package parser
+package mf
 
 import scala.util.parsing.combinator.RegexParsers
-import typecheck.AST._
+import AST._
 
 // TODO: the top level lambdas need to be defs, not just raw lambdas.
 object Parser {

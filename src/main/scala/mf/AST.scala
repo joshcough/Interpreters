@@ -1,4 +1,4 @@
-package typecheck
+package mf
 
 object AST {
 

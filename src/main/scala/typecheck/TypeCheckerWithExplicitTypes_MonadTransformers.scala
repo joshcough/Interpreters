@@ -1,4 +1,4 @@
-package typecheck.demo
+package typecheck
 
 object TypeCheckerWithExplicitTypes_MonadTransformers {
 
@@ -9,7 +9,6 @@ object TypeCheckerWithExplicitTypes_MonadTransformers {
   import scalaz.std.either._
 
   def success(t: Type) = Right(t)
-
   def typeError(msg: String) = Left(msg)
 
   def find(s: String, env: TypeEnv): Either[String, Type] =

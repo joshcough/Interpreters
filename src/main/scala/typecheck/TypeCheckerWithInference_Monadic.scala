@@ -1,4 +1,4 @@
-package typecheck.demo
+package typecheck
 
 /**
  * Note: A lot of this code is a port from:

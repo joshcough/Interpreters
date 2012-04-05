@@ -1,4 +1,4 @@
-package parser
+package mf
 
 object TypeParserTests  extends org.scalacheck.Properties("Type Parser") with util.Compare{
 
@@ -22,14 +22,14 @@ object TypeParserTests  extends org.scalacheck.Properties("Type Parser") with ut
 
 object ExpressionParserTests  extends org.scalacheck.Properties("Expression Parser") with util.Compare {
 
-  import typecheck.AST._
+  import AST._
 
   val id = Lam(Name("x"), Name("x"))
   val idDef = Def(Name("id"), id)
-  
-  parseExp("(def id (x -> x)) 7", Program(List(idDef), Lit(Num(7))))
-  parseExp("(def id (x -> x)) (x -> x)", Program(List(idDef), id))
-  parseExp("(def id (x -> x)) (def id (x -> x)) (x -> x)", Program(List(idDef, idDef), id))
+
+  parseExp("(def id (x -> x)) 7", Program(List(), List(idDef), Lit(Num(7))))
+  parseExp("(def id (x -> x)) (x -> x)", Program(List(), List(idDef), id))
+  parseExp("(def id (x -> x)) (def id (x -> x)) (x -> x)", Program(List(), List(idDef, idDef), id))
   parseExp("6",          Program(Lit(Num(6))))
   parseExp("( x -> x )", Program(id))
   parseExp("(x->x)",     Program(id))

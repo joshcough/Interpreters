@@ -1,4 +1,4 @@
-package typecheck.demo
+package typecheck
 
 object TypeCheckerWithInferenceAST {
 
