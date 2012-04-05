@@ -1,8 +1,8 @@
-package typecheck
+package typecheck.demo
 
 /**
  * Note: A lot of this code is a port from:
- *   http://fsharpcode.blogspot.com/2010/08/hindley-milner-type-inference-sample.html
+ * http://fsharpcode.blogspot.com/2010/08/hindley-milner-type-inference-sample.html
  *
  * TODO: comment is out of date.
  *
@@ -15,10 +15,10 @@ package typecheck
  * and corresponding literals for those types (shown in examples below).
  *
  * There are four built-in functions:
- *   if  : (Bool -> T -> T) -> T
- *   add : (Int  -> Int) -> Int
- *   sub : (Int  -> Int) -> Int
- *   eql : (Int  -> Int) -> Bool
+ * if  : (Bool -> T -> T) -> T
+ * add : (Int  -> Int) -> Int
+ * sub : (Int  -> Int) -> Int
+ * eql : (Int  -> Int) -> Bool
  *
  * The user is not required to put explicit type declarations on function arguments,
  * or the function return type. These types will be inferred by the type checker.
@@ -26,7 +26,7 @@ package typecheck
  */
 
 /**
- *  TODO: these add let...
+ * TODO: these add let...
  * What happens here?
  * let id x = x in if (id true) (id 6) (id 7)
  */
@@ -39,18 +39,20 @@ object TypeCheckerWithInference {
 
   // Calculate the most general unifier of two types,
   // raising a UnificationError if there isn't one
-  def mgu(a:Type, b:Type, s:Subst): Subst = {
+  def mgu(a: Type, b: Type, s: Subst): Subst = {
     //println("calculating mgu for: " + (a, b, s))
     val result = (subs(a, s), subs(b, s)) match {
       case (TyVar(ta), TyVar(tb)) if ta == tb => s
       // this does the 'occurs' check for infinite types.
-      case (TyVar(ta), _) if (! getTVarsOfType(b).contains(ta)) =>
+      case (TyVar(ta), _) if (!getTVarsOfType(b).contains(ta)) =>
         extend(TyVar(ta), b, s)
       case (_, TyVar(_)) => mgu(b, a, s)
       case (TyLam(a1, b1), TyLam(a2, b2)) => mgu(a1, a2, mgu(b1, b2, s))
       case (TyCon(name1, args1), TyCon(name2, args2)) if name1 == name2 =>
-        args1.zip(args2).foldLeft(s){ case (sp, (t1, t2)) => mgu(t1, t2, sp) }
-      case (x, y) => sys.error("unable to unify: " + (x, y))
+        args1.zip(args2).foldLeft(s) {
+          case (sp, (t1, t2)) => mgu(t1, t2, sp)
+        }
+      case (x, y) => sys.error("unable to unify: " +(x, y))
     }
     //println("mgu = " + result)
     result
@@ -59,8 +61,8 @@ object TypeCheckerWithInference {
   // Calculate the principal type scheme for an expression in a given
   // typing environment
   def tp(env: Env, exp: Exp, bt: Type, s: Subst): Subst = exp match {
-    case Lit(v)  => mgu(litToTy(v), bt, s)
-    case i@Id(n) => env.get(i).map{
+    case Lit(v) => mgu(litToTy(v), bt, s)
+    case i@Name(n) => env.get(i).map {
       t => mgu(subs(t, s), bt, s)
     }.getOrElse(sys.error("unknown id: " + n))
     case Lam(x, e) =>
@@ -73,7 +75,9 @@ object TypeCheckerWithInference {
   }
 
   var ts = Iterator.from(0)
+
   def resetTypCounter() = ts = Iterator.from(0)
+
   def newTypVar() = TyVar("t" + ts.next())
 
   // the top level type check function
@@ -84,10 +88,10 @@ object TypeCheckerWithInference {
 
     // rename all the type variables starting from t0
     // this cleans things up a bit as far as presentation goes.
-    def renameTyVars(t:Type): Type = {
+    def renameTyVars(t: Type): Type = {
       val count = Iterator.from(0)
       val m = collection.mutable.Map[String, String]()
-      def renameTyVarsHelper(t:Type): Type = t match {
+      def renameTyVarsHelper(t: Type): Type = t match {
         case TyVar(oldName) => TyVar(m.getOrElseUpdate(oldName, {
           val newName = "t" + count.next()
           m += (oldName -> newName)

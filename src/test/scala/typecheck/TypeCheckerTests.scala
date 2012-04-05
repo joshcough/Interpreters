@@ -24,6 +24,9 @@ object TypeCheckerTests extends org.scalacheck.Properties("TypeChecker") with ut
   typeCheck("if", "Bool -> 't0 -> 't0 -> 't0")
   typeCheck("((identity if) (identity true) (identity 5) (identity 6))", "Int")
 
+//  typeCheck("(Cons 5 (Cons 6 Nil))", "List Int")
+//  typeCheck("Nil", "List 't0")
+
 // TODO: add tests for failures. here is one example:
 //  typeCheckFailure("(if true 5 true)", "Unable to unify (Int, Bool)")
 

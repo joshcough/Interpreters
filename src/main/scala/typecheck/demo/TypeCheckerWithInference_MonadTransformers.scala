@@ -1,16 +1,16 @@
-package typecheck
+package typecheck.demo
 
 /**
  * Notes:
  *
  * A lot of this code is a port from:
- *   http://fsharpcode.blogspot.com/2010/08/hindley-milner-type-inference-sample.html
+ * http://fsharpcode.blogspot.com/2010/08/hindley-milner-type-inference-sample.html
  *
  * The monad transformation stuff is inspired by:
- *   http://www.grabmueller.de/martin/www/pub/Transformers.pdf
+ * http://www.grabmueller.de/martin/www/pub/Transformers.pdf
  *
  * Robby Findler's lecture notes on type inference can be found here:
- *   http://www.eecs.northwestern.edu/~robby/courses/321-2012-winter/lecture16.pdf
+ * http://www.eecs.northwestern.edu/~robby/courses/321-2012-winter/lecture16.pdf
  */
 object TypeCheckerWithInference_MonadTransformers {
 
@@ -52,6 +52,7 @@ object TypeCheckerWithInference_MonadTransformers {
   }
 
   def success(s: Subst): Either[String, Subst] = Right(s)
+
   def typeError(msg: String): Either[String, Subst] = Left(msg)
 
   // Calculate the principal type scheme for an expression in a given
@@ -67,19 +68,19 @@ object TypeCheckerWithInference_MonadTransformers {
     def newTypVar: ETSType = eitherT[S, String, Type]((for (n <- modify[Int](_ + 1)) yield
       TyVar("t" + n)).map(t => (Right(t): Either[String, Type])))
     exp match {
-      case Lit(v)  => liftES(mgu(litToTy(v), bt, s))
-      case i@Id(n) => liftES(env.get(i).map {
+      case Lit(v) => liftES(mgu(litToTy(v), bt, s))
+      case i@Name(n) => liftES(env.get(i).map {
         t => mgu(subs(t, s), bt, s)
       }.getOrElse(Left("unknown id: " + n)))
       case Lam(x, e) => for {
-        a   <- newTypVar
-        b   <- newTypVar
-        s1  <- liftES(mgu(bt, TyLam(a, b), s))
+        a <- newTypVar
+        b <- newTypVar
+        s1 <- liftES(mgu(bt, TyLam(a, b), s))
         res <- tp(env + (x -> a), e, b, s1)
       } yield res
       case App(e1, e2) => for {
-        a   <- newTypVar
-        f   <- tp(env, e1, TyLam(a, bt), s)
+        a <- newTypVar
+        f <- tp(env, e1, TyLam(a, bt), s)
         res <- tp(env, e2, a, f)
       } yield res
     }
@@ -105,7 +106,7 @@ object TypeCheckerWithInference_MonadTransformers {
   // the top level type check function
   def typeCheck(exp: Exp): Either[String, Type] = {
     val a = TyVar("init")
-    for{ s <- tp(predef, exp, a, Map()).run(0)._1 } yield renameTyVars(subs(a, s))
+    for {s <- tp(predef, exp, a, Map()).run(0)._1} yield renameTyVars(subs(a, s))
   }
 }
 

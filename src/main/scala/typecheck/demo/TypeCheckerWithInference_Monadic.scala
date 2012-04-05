@@ -1,8 +1,8 @@
-package typecheck
+package typecheck.demo
 
 /**
  * Note: A lot of this code is a port from:
- *   http://fsharpcode.blogspot.com/2010/08/hindley-milner-type-inference-sample.html
+ * http://fsharpcode.blogspot.com/2010/08/hindley-milner-type-inference-sample.html
  */
 object TypeCheckerWithInference_Monadic {
 
@@ -39,8 +39,8 @@ object TypeCheckerWithInference_Monadic {
   def tp(env: Env, exp: Exp, bt: Type, s: Subst): State[Int, Subst] = {
     def newTypVar = for (n <- modify[Int](_ + 1)) yield TyVar("t" + n)
     exp match {
-      case Lit(v)  => state(mgu(litToTy(v), bt, s))
-      case i@Id(n) => state(env.get(i).map {
+      case Lit(v) => state(mgu(litToTy(v), bt, s))
+      case i@Name(n) => state(env.get(i).map {
         t => mgu(subs(t, s), bt, s)
       }.getOrElse(sys.error("unknown id: " + n)))
       case Lam(x, e) => for {

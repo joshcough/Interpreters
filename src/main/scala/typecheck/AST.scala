@@ -1,20 +1,29 @@
 package typecheck
 
-object TypeCheckerWithInferenceAST {
+object AST {
 
-  // AST
+  /** Term Tree **/
   trait Literal
   case class Num(i:Int) extends Literal
   case class Bool(b:Boolean) extends Literal
 
-  trait Exp
-  case class Id(name:String) extends Exp
-  case class Lam(arg: Id, body: Exp) extends Exp
+  sealed trait Exp
+  case class Name(name:String) extends Exp
+  case class Lam(arg: Name, body: Exp) extends Exp
   case class App(f:Exp, arg: Exp) extends Exp
   case class Lit(l:Literal) extends Exp
-  //  Let      of string * Exp * Exp   // local definition
+  case class ConstructorApp(name:Name, arguments: List[Exp]) extends Exp
+  //TODO: case class Let(name:Name, e: Exp, body: Exp)
 
-  // Type Tree
+  case class Constructor(name: Name, arguments: List[Type])
+  case class DataDef(name: Name, typeVars: List[TyVar], constructors: List[Constructor])
+  case class Def(name:Name, lam:Lam)
+  object Program{
+    def apply(e:Exp): Program = Program(List(), e)
+  }
+  case class Program(defs: List[Def], e: Exp)
+
+  /** Type Tree **/
   sealed trait Type
   case class TyLam(f:Type, arg:Type) extends Type {
     override def toString = (f match {
@@ -26,7 +35,7 @@ object TypeCheckerWithInferenceAST {
     override def toString = "'" + name
   }
   case class TyCon(name:String, args: List[Type]) extends Type {
-    override def toString = name
+    override def toString = (name + " " + args.mkString(" ")).trim
   }
   case class TyForall(tvs: List[TyVar], t: Type) extends Type {
     override def toString = "forall " + tvs.mkString(",") + " . " + t
@@ -35,12 +44,6 @@ object TypeCheckerWithInferenceAST {
       case (newT, (oldTv, newTv)) => swapTyVars(newT, oldTv, newTv)
     }
   }
-
-  case class Def(name:Id, lam:Lam)
-  object Program{
-    def apply(e:Exp): Program = Program(List(), e)
-  }
-  case class Program(defs: List[Def], e: Exp)
 
   // Subtitutions
   type Subst = Map[TyVar, Type]
@@ -64,7 +67,7 @@ object TypeCheckerWithInferenceAST {
   }
   
   // Environments
-  type Env = Map[Id, Type]
+  type Env = Map[Name, Type]
 
   def getTVarsOfType(t:Type): Set[String] = t match {
     case TyVar(n)       => Set(n)
@@ -80,13 +83,19 @@ object TypeCheckerWithInferenceAST {
     case Bool(_) => BoolT
   }
 
+  def listCon(a:TyVar) = TyCon("List", List(a))
+
+  val a = TyVar("a")
+  
   val predef: Env = Map(
-    Id("identity") -> TyForall(List(TyVar("a")), TyLam(TyVar("a"), TyVar("a"))),
-    Id("+")   -> TyLam(IntT, TyLam(IntT, IntT)),
-    Id("-")   -> TyLam(IntT, TyLam(IntT, IntT)),
-    Id("==")  -> TyLam(IntT, TyLam(IntT, BoolT)),
-    Id("and") -> TyLam(BoolT, TyLam(BoolT, BoolT)),
-    Id("or")  -> TyLam(BoolT, TyLam(BoolT, BoolT)),
-    Id("if")  -> TyForall(List(TyVar("a")), TyLam(BoolT, TyLam(TyVar("a"), TyLam(TyVar("a"), TyVar("a")))))
+    Name("identity") -> TyForall(List(TyVar("a")), TyLam(TyVar("a"), TyVar("a"))),
+    Name("+")   -> TyLam(IntT, TyLam(IntT, IntT)),
+    Name("-")   -> TyLam(IntT, TyLam(IntT, IntT)),
+    Name("==")  -> TyLam(IntT, TyLam(IntT, BoolT)),
+    Name("and") -> TyLam(BoolT, TyLam(BoolT, BoolT)),
+    Name("or")  -> TyLam(BoolT, TyLam(BoolT, BoolT)),
+    Name("if")  -> TyForall(List(a), TyLam(BoolT, TyLam(a, TyLam(a, a)))),
+    Name("Nil") -> listCon(a),
+    Name("Cons")-> TyForall(List(a), TyLam(a, TyLam(listCon(a), listCon(a))))
   )
 }

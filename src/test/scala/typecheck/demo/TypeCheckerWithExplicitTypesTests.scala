@@ -1,9 +1,9 @@
-package typecheck
+package typecheck.demo
 
 import TypeCheckerWithExplicitTypes_V1._
 
 object TypeCheckerWithExplicitTypesTests extends
-  org.scalacheck.Properties("TypeCheckerWithExplicitTypes") with util.Compare {
+org.scalacheck.Properties("TypeCheckerWithExplicitTypes") with util.Compare {
 
   typeCheck(Num(7), NumT)
   typeCheck(Bool(true), BoolT)
@@ -31,8 +31,8 @@ object TypeCheckerWithExplicitTypesTests extends
   //    "type-error expected same types in 2nd and 3rd positions but got (NumT (boolT))")
 
 
-  typeCheck(Add(Num(7),Num(7)), NumT)
-  typeCheck(Sub(Num(7),Num(7)), NumT)
+  typeCheck(Add(Num(7), Num(7)), NumT)
+  typeCheck(Sub(Num(7), Num(7)), NumT)
   //    (test/exn (type-check-expr (add (bool #t) Num(7)))
   //    "add: type-error expected: NumT in position 1, but found: (boolT)")
   //    (test/exn (type-check-expr (sub (bool #t) Num(7)))
@@ -53,11 +53,11 @@ object TypeCheckerWithExplicitTypesTests extends
     ArrowT(List(NumT), NumT)
   )
   typeCheck(
-    Fun(List('x -> NumT,'y -> NumT,'z -> NumT), Add(Id('x), Num(5))),
+    Fun(List('x -> NumT, 'y -> NumT, 'z -> NumT), Add(Id('x), Num(5))),
     ArrowT(List(NumT, NumT, NumT), NumT)
   )
   typeCheck(
-    Fun(List('x -> NumT,'y -> NumT,'z -> NumT), Eql(Id('z), Add(Id('x), Id('y)))),
+    Fun(List('x -> NumT, 'y -> NumT, 'z -> NumT), Eql(Id('z), Add(Id('x), Id('y)))),
     ArrowT(List(NumT, NumT, NumT), BoolT)
   )
   typeCheck(
@@ -69,7 +69,7 @@ object TypeCheckerWithExplicitTypesTests extends
     NumT
   )
   typeCheck(
-    App(Fun(List('x -> NumT, 'y->BoolT), If(Id('y), Add(Id('x), Num(5)), Num(0))), List(Num(7), Bool(false))),
+    App(Fun(List('x -> NumT, 'y -> BoolT), If(Id('y), Add(Id('x), Num(5)), Num(0))), List(Num(7), Bool(false))),
     NumT
   )
   typeCheck(
@@ -116,6 +116,6 @@ object TypeCheckerWithExplicitTypesTests extends
   "eql: type-error expected: NumT in position 1, but found: (boolT)")
   */
 
-  def typeCheck(exp:Tree, expected:Type, env:TypeEnv = Nil) =
+  def typeCheck(exp: Tree, expected: Type, env: TypeEnv = Nil) =
     compare(exp.toString, TypeCheckerWithExplicitTypes_V1.typeCheck(exp, env), expected)
 }

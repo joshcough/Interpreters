@@ -1,7 +1,6 @@
 package typecheck
 
 import parser.Parser
-import parser.Parser.{parse => _}
 
 /**
  * Notes:
@@ -17,7 +16,7 @@ import parser.Parser.{parse => _}
  */
 object TypeChecker {
 
-  import TypeCheckerWithInferenceAST._
+  import AST._
 
   import scalaz.State._
   import scalaz.std.list.{listInstance => listTraverse}
@@ -26,7 +25,7 @@ object TypeChecker {
   import scalaz.std.either._
   import scalaz.syntax.monad._
 
-  // Unification
+  /** Unification **/
 
   def freshen(t:TyForall): S[Type] = {
     // TODO: UGH! This is duplicated. ok for now, just trying to get this to compile.
@@ -35,9 +34,11 @@ object TypeChecker {
       tvs <- listTraverse.sequenceS(t.tvs.map(_ => newTV))
     } yield t.swapAll(tvs)
   }
-  
-  // Calculate the most general unifier of two types,
-  // raising a UnificationError if there isn't one
+
+  /**
+   * Calculate the most general unifier of two types,
+   * raising a UnificationError if there isn't one
+   */
   def mgu(a: Type, b: Type, s: Subst): ETS[Subst] = {
     //println("calculating mgu for: " + (a, b, s))
     val sub1 = subs(a, s)
@@ -53,7 +54,7 @@ object TypeChecker {
         s1 <- mgu(t1, t, s)
       } yield s1
       case (TyVar(ta), TyVar(tb)) if ta == tb => success(s)
-      // this does the 'occurs' check for infinite types.
+      /** this does the 'occurs' check for infinite types. **/
       case (TyVar(ta), _) if (!getTVarsOfType(b).contains(ta)) =>
         success(extend(TyVar(ta), b, s))
       case (_, TyVar(_)) => mgu(b, a, s)
@@ -82,36 +83,39 @@ object TypeChecker {
   type S[T] = State[TypeCheckState, T]
   type ETS[T] = EitherT[S, String, T]
 
-  //
-  // get things out of the state
-  //
+  /**
+   * get things out of the state
+   */
 
   def mapState[T](f: TypeCheckState => T) =
     eitherT[S, String, T](for(t <- init.map(f)) yield Right(t) : Either[String, T])
   def getEnv   = mapState(_.env)
   def getSubst = mapState(_.subst)
 
-  def find(id: Id, e: Env, bt: Type, s: Subst) = e.get(id).map {
+  def find(id: Name, e: Env, bt: Type, s: Subst) = e.get(id).map {
     t => mgu(subs(t, s), bt, s)
   }.getOrElse(typeError("unknown id: " + id.name))
 
-  //
-  // update things in the state
-  //
+  /**
+   * update things in the state
+   */
 
   def modState(f: TypeCheckState => TypeCheckState) = modify[TypeCheckState](f)
   def liftS[T](s:State[TypeCheckState,T]) =
     eitherT[S, String, T](s.map{ t => Right(t): Either[String, T] })
-  // get a fresh type variable, incrementing the count in the state in the process.
+  /* get a fresh type variable, incrementing the count in the state in the process. */
   def newTypVar: ETS[Type] =
     liftS(for (n <- modState(t => t.copy(t.tyVarCount + 1))) yield TyVar("t" + n.tyVarCount))
-  // update the environment in the state
-  def updateEnv(id:Id, s:Type): ETS[Env] =
+  /* update the environment in the state */
+  def updateEnv(id:Name, s:Type): ETS[Env] =
     liftS(modState(t => t.copy(env = t.env + (id -> s))).map(_.env))
-  // run a function that produces a new subst
-  // and update the state with that new subst afterwards
+
+  /**
+   * run a function that produces a new subst
+   * and update the state with that new subst afterwards
+   */
   def updateSubst(f: Subst => ETS[Subst]): ETS[Subst] = {
-    // change the subst in the state
+    /** change the subst in the state **/
     def setSubst(newSubst: Subst): ETS[Subst] =
       liftS(modState(t => t.copy(subst = newSubst)).map(_.subst))
     for { s  <- getSubst; s1 <- f(s); _  <- setSubst(s1) } yield s1
@@ -126,7 +130,7 @@ object TypeChecker {
     implicit def unitE(e: Either[String, Subst]): ETS[Subst] = eitherT[S, String, Subst](state(e))
     exp match {
       case Lit(v) => updateSubst(mgu(litToTy(v), bt, _))
-      case id@Id(n) => for {
+      case id@Name(n) => for {
         e <- getEnv
         s <- updateSubst(find(id, e, bt, _))
       } yield s
@@ -145,8 +149,10 @@ object TypeChecker {
     }
   }
 
-  // rename all the type variables starting from t0
-  // this cleans things up a bit as far as presentation goes.
+  /**
+   * rename all the type variables starting from t0
+   * this cleans things up a bit as far as presentation goes.
+   */
   def renameTyVars(t: Type): Type = {
     type R = (Int, Map[String, String])
     def update(k: String, r: R) =
@@ -187,27 +193,31 @@ object TypeChecker {
     so that is a start.
   **/
   def typeCheck(s:String): Either[String, Type] = for {
-    p <- Parser.parse(s)
+    p <- Parser.parseExp(s)
     t <- typeCheck(p)
   } yield t
 
-  // TODO: not sure how its even possible to have a bare type here
-  // TODO: and not an Either. I think I do have an either, but I'm just
-  // TODO: pulling the subst from the state, and not checking to see
-  // TODO: if the result is a Left or Right.
-  // TODO: I should just use the subst from the result, not the state.
+  /**
+   * TODO: not sure how its even possible to have a bare type here
+   * TODO: and not an Either. I think I do have an either, but I'm just
+   * TODO: pulling the subst from the state, and not checking to see
+   * TODO: if the result is a Left or Right.
+   * TODO: I should just use the subst from the result, not the state.
+   */
   def typeCheck(p: Program): Either[String, Type] = {
     //val _ = println(p)
-    // make up frest type variables for each exp
+    /* make up frest type variables for each exp */
     val exps = p.defs.map(_.lam) ::: List(p.e)
     val etv = exps.zip(Stream.from(0).map((i:Int) => TyVar("t" + i))).toList
     //val _ = println(etv)
-    // TODO: i think there is a huge problem here...im not putting the new lambdas into the env.
-    // TODO: additionally, i have no good way to name them. currently just by their params.
-    // TODO: im going to have to make a top level def, instead of just lambda
+    /**
+     * TODO: i think there is a huge problem here...im not putting the new lambdas into the env.
+     * TODO: additionally, i have no good way to name them. currently just by their params.
+     * TODO: im going to have to make a top level def, instead of just lambda
+     */
     val s = listTraverse.sequenceS(etv.map{ case (e, tv) => tp(e, tv) }.map(_.run))
     //val _ = println(state)
-    // run everything with a base state.
+    /* run everything with a base state. */
     val r = s(TypeCheckState(etv.length, predef, Map()))
 
     for{
