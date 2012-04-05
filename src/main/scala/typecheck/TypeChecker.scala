@@ -206,10 +206,12 @@ object TypeChecker {
    */
   def typeCheck(p: Program): Either[String, Type] = {
     //val _ = println(p)
-    /* make up frest type variables for each exp */
-    val exps = p.defs.map(_.lam) ::: List(p.e)
-    val etv = exps.zip(Stream.from(0).map((i:Int) => TyVar("t" + i))).toList
+
+    /* make up frest type variables for each def, and the final expression */
+    def tvSupply = Stream.from(0).map((i:Int) => TyVar("t" + i))
+    val etv = (p.defs.map(_.lam) ::: List(p.e)).zip(tvSupply).toList
     //val _ = println(etv)
+
     /**
      * TODO: i think there is a huge problem here...im not putting the new lambdas into the env.
      * TODO: additionally, i have no good way to name them. currently just by their params.
@@ -217,9 +219,11 @@ object TypeChecker {
      */
     val s = listTraverse.sequenceS(etv.map{ case (e, tv) => tp(e, tv) }.map(_.run))
     //val _ = println(state)
+
     /* run everything with a base state. */
     val r = s(TypeCheckState(etv.length, predef, Map()))
 
+    /* finally, rename all the type variables so that they look nice */
     for{
       subst <- r._1.last
     } yield renameTyVars(subs(etv.last._2, subst))

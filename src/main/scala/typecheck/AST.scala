@@ -19,9 +19,9 @@ object AST {
   case class DataDef(name: Name, typeVars: List[TyVar], constructors: List[Constructor])
   case class Def(name:Name, lam:Lam)
   object Program{
-    def apply(e:Exp): Program = Program(List(), e)
+    def apply(e:Exp): Program = Program(List(), List(), e)
   }
-  case class Program(defs: List[Def], e: Exp)
+  case class Program(dataDefs: List[DataDef], defs: List[Def], e: Exp)
 
   /** Type Tree **/
   sealed trait Type
@@ -88,7 +88,7 @@ object AST {
   val a = TyVar("a")
   
   val predef: Env = Map(
-    Name("identity") -> TyForall(List(TyVar("a")), TyLam(TyVar("a"), TyVar("a"))),
+    Name("id") -> TyForall(List(TyVar("a")), TyLam(TyVar("a"), TyVar("a"))),
     Name("+")   -> TyLam(IntT, TyLam(IntT, IntT)),
     Name("-")   -> TyLam(IntT, TyLam(IntT, IntT)),
     Name("==")  -> TyLam(IntT, TyLam(IntT, BoolT)),
