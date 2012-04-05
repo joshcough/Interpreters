@@ -207,6 +207,12 @@ object TypeChecker {
   def typeCheck(p: Program): Either[String, Type] = {
     //val _ = println(p)
 
+    /**
+     * TODO: i am not dealing with data defs here yet.
+     * TODO: i think i can allow forward reference pretty simply,
+     * TODO: just by keeping a map from def/datadef/cons name to type variable.
+     */
+
     /* make up frest type variables for each def, and the final expression */
     def tvSupply = Stream.from(0).map((i:Int) => TyVar("t" + i))
     val etv = (p.defs.map(_.lam) ::: List(p.e)).zip(tvSupply).toList
