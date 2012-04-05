@@ -1,5 +1,14 @@
 package mf
 
+import AST._
+
+import scalaz.State._
+import scalaz.std.list.{listInstance => listTraverse}
+import scalaz.{State, EitherT}
+import EitherT._
+import scalaz.std.either._
+import scalaz.syntax.monad._
+
 /**
  * Notes:
  *
@@ -15,15 +24,6 @@ package mf
  *   TODO: TypeChecker uses parser, but it probably shouldn't. It should just get the AST.
  */
 object TypeChecker {
-
-  import AST._
-
-  import scalaz.State._
-  import scalaz.std.list.{listInstance => listTraverse}
-  import scalaz.{State, EitherT}
-  import EitherT._
-  import scalaz.std.either._
-  import scalaz.syntax.monad._
 
   /** Unification **/
 
