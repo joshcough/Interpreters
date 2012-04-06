@@ -10,9 +10,7 @@ trait ParseTestHelpers extends util.Compare { self: Properties =>
 
   val id = Lam("x", "x")
   val idDef = Val("id", id)
-  val a = TyVar("a")
-  val b = TyVar("b")
-  val c = TyVar("c")
+  val (a,b,c) = (TyVar("a"), TyVar("b"), TyVar("c"))
 
   def parseType(typeString: String, expectedTypeString:Option[String]=None) = compareR(
     typeString,
@@ -22,7 +20,6 @@ trait ParseTestHelpers extends util.Compare { self: Properties =>
   def parseExp(code: String, expected: Exp) = compareR(code, Parser.parseExpr(code), expected)
   def parseData(code: String, expected: DataDef) = compareR(code, Parser.parseData(code), expected)
   def parseProgram(code: String, expected: Program) = compareR(code, Parser.parseProgram(code), expected)
-
 }
 
 object TypeParserTests extends Properties("Type Parser") with ParseTestHelpers {

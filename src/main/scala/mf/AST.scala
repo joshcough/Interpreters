@@ -42,8 +42,8 @@ object AST {
   // have further type arguments, to avoid ambiguity. For example: 
   // Maybe (Maybe 'a) vs. Maybe Maybe a
   // The first is correct, the second is just weird.
-  case class TyCon(name: String, args: List[Type]) extends Type {
-    override def toString = (name + " " + args.mkString(" ")).trim
+  case class TyCon(name: Name, args: List[Type]) extends Type {
+    override def toString = (name.name + " " + args.mkString(" ")).trim
   }
   case class TyForall(tvs: List[TyVar], t: Type) extends Type {
     override def toString = "forall " + tvs.mkString(",") + " . " + t
@@ -83,13 +83,6 @@ object AST {
     case TyCon(_, args) => args.flatMap(t => getTVarsOfType(t)).toSet
   }
 
-  val IntT  = TyCon("Int",  Nil)
-  val BoolT = TyCon("Bool", Nil)
-
-  def litToTy(l: Literal): Type = l match {
-    case Num(_)  => IntT
-    case Bool(_) => BoolT
-  }
-
-  def listCon(a: TyVar) = TyCon("List", List(a))
+  val IntT  = TyCon(Name("Int"),  Nil)
+  def litToTy(l: Literal): Type = l match { case Num(_)  => IntT }
 }

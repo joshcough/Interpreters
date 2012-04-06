@@ -13,7 +13,7 @@ object Parser {
      */
 
     val NUM  = """[1-9][0-9]*""".r  ^^ { s => Lit(Num (s.toInt)) }
-    val BOOL = ("true" | "false")   ^^ { s => Lit(Bool(s.toBoolean)) }
+    val LIT = NUM // TODO: add chars, strings? doubles?
     val TERM_ID   = """[a-z]([a-zA-Z0-9]|_[a-zA-Z0-9]|')*""".r ^^ { s => Name(s) }
     // TODO: these are kind of bogus...figure out a better way.
     val OP   = ("+" | "-" | "*" | "/" | "==")  ^^ { s => Name(s) }
@@ -28,7 +28,7 @@ object Parser {
     def CONS_APP: Parser[ConstructorApp] = parens(CONS_ID ~ (EXPR*)) ^^ {
       case name ~ exps => ConstructorApp(name, exps)
     }
-    def EXPR: Parser[Exp] = BOOL | NUM  | TERM_ID | OP | LAM | APP | CONS_APP | CONS_ID
+    def EXPR: Parser[Exp] = LIT | TERM_ID | OP | LAM | APP | CONS_APP | CONS_ID
 
     val CONS_ID: Parser[Name]     = """[A-Z]([a-zA-Z0-9]|_[a-zA-Z0-9]|')*""".r ^^ { s => Name(s) }
     val CONS: Parser[Constructor] = parens(CONS_ID ~ opt(TYPE*)) ^^ {
@@ -58,15 +58,17 @@ object Parser {
      */
 
     val INTT   = "Int".r  ^^ { _ => IntT }
-    val BOOLT  = "Bool".r ^^ { _ => BoolT }
+    val LITT   = INTT
+    // TODO: not supporting arguments to tycon yet...
+    val TYCON  = CONS_ID ^^ { s => TyCon(s, Nil) }
     val TYVAR  = """'[a-z]([0-9])*""".r ^^ { s => TyVar(s.drop(1)) }
     //('t0 -> 't1) -> ('t1 -> 't2) -> 't0 -> 't2"
     //(('t1 -> 't2) -> 't1 -> 't2) -> 't2
-    def TYLAM  = ((INTT | BOOLT | TYVAR) ~ "->" ~ TYPE) ^^ { case in ~ "->" ~ out => TyLam(in, out) }
+    def TYLAM  = ((LITT | TYCON | TYVAR) ~ "->" ~ TYPE) ^^ { case in ~ "->" ~ out => TyLam(in, out) }
     def TYLAM_PARENS: Parser[TyLam] = parens(TYLAM | TYLAM_PARENS) ~ opt("->" ~> TYPE) ^^ {
       case in ~ maybeOut => maybeOut.map(TyLam(in, _)).getOrElse(in)
     }
-    def TYPE: Parser[Type] = TYLAM_PARENS | TYLAM | INTT | BOOLT | TYVAR
+    def TYPE: Parser[Type] = TYLAM_PARENS | TYLAM | LITT | TYCON | TYVAR
 
     def parseData(s:String) = parseToEither(s, DATA)
     def parseType(s:String) = parseToEither(s, TYPE)
