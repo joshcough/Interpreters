@@ -28,22 +28,33 @@ object Parser {
     def CONS_APP: Parser[ConstructorApp] = parens(CONS_ID ~ (EXPR*)) ^^ {
       case name ~ exps => ConstructorApp(name, exps)
     }
-    def EXPR: Parser[Exp] = BOOL | NUM  | TERM_ID | OP | LAM | APP | CONS_APP
-    def DEF: Parser[Def] = parens("def" ~> TERM_ID ~ LAM) ^^ { case id ~ lam => Def(id, lam) }
+    def EXPR: Parser[Exp] = BOOL | NUM  | TERM_ID | OP | LAM | APP | CONS_APP | CONS_ID
+
     val CONS_ID: Parser[Name]     = """[A-Z]([a-zA-Z0-9]|_[a-zA-Z0-9]|')*""".r ^^ { s => Name(s) }
-    val CONS: Parser[Constructor] = parens(CONS_ID ~ opt(parens(TYPE*))) ^^ {
+    val CONS: Parser[Constructor] = parens(CONS_ID ~ opt(TYPE*)) ^^ {
       case name ~ args => Constructor(name, args.getOrElse(Nil))
     }
-    def DATA = parens("data" ~> CONS_ID ~ (TYVAR*) ~ (CONS*)) ^^ { case name ~ tvs ~ cons => DataDef(name, tvs, cons)}
-    def PROG: Parser[Program] = (DATA*) ~ (DEF*) ~ EXPR ^^ { case data ~ defs ~ exp => Program(data, defs, exp) }
+    val DATA = parens("data" ~> CONS_ID ~ parens(TYVAR*) ~ parens(CONS+)) ^^
+      { case name ~ tvs ~ cons => DataDef(name, tvs, cons)}
+    def VAL: Parser[Val] = parens("val" ~> TERM_ID ~ EXPR) ^^ { case id ~ exp => Val(id, exp) }
+    def DEF: Parser[Val] = parens("def" ~> TERM_ID ~ LAM)  ^^ { case id ~ lam => Val(id, lam) }
 
-    def parseExp(s:String): Either[String, Program] = parse(PROG, s) match {
-      case Success(result, _) => Right(result)
-      case f@Failure(msg, _)  => Left(msg)
-    }
+    def DECL = DATA | VAL | DEF
+    def PROG = (DECL+) ^^ { case decls => Program(decls) }
+
+    def parseExpr(s:String)    = parseToEither(s, EXPR)
+    def parseProgram(s:String) = parseToEither(s, PROG)
 
     /**
      * Type Parsers
+     */
+
+    //TODO: not yet parsing higher kinded types. this is causing problems in data defs.
+
+    /**
+     * random notes:
+     * Haskell gives this: Maybe (Maybe Int)
+     * data Dumb = Dumb (Maybe (Maybe Int))
      */
 
     val INTT   = "Int".r  ^^ { _ => IntT }
@@ -56,14 +67,23 @@ object Parser {
       case in ~ maybeOut => maybeOut.map(TyLam(in, _)).getOrElse(in)
     }
     def TYPE: Parser[Type] = TYLAM_PARENS | TYLAM | INTT | BOOLT | TYVAR
-    def parseType(s:String): Either[String, Type] = parse(TYPE, s) match {
+
+    def parseData(s:String) = parseToEither(s, DATA)
+    def parseType(s:String) = parseToEither(s, TYPE)
+
+    /**
+     * Helper functions
+     */
+
+    def parseToEither[T](s:String, p: Parser[T]): Either[String, T] = parse(p, s) match {
       case Success(result, _) => Right(result)
       case f@Failure(msg, _)  => Left(msg)
     }
-
     def parens[T](p:Parser[T]):Parser[T] = "(" ~> p <~ ")"
   }
 
-  def parseExp(s:String)  = Inner.parseExp(s)
-  def parseType(s:String) = Inner.parseType(s)
+  def parseProgram(s:String)  = Inner.parseProgram(s)
+  def parseType(s:String)     = Inner.parseType(s)
+  def parseData(s:String)     = Inner.parseData(s)
+  def parseExpr(s:String)     = Inner.parseExpr(s)
 }

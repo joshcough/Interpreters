@@ -18,7 +18,7 @@ trait Reader {
       case x   :: tail =>
         val (next, rest) = readWithRest(stream)
         readList(rest, acc ::: List(next), terminator)
-      case List()     => error("unclosed list")
+      case List()     => sys.error("unclosed list")
     }
 
     def readSymbol(stream:List[Char]): (Symbol, List[Char]) = {
@@ -36,12 +36,12 @@ trait Reader {
     def readStringLit(stream: List[Char], acc: String): (String, List[Char]) = stream match {
       case '"' :: tail => (acc + '"', tail)
       case c   :: tail => readStringLit(tail, acc + c)
-      case List()      => error("unclosed string literal")
+      case List()      => sys.error("unclosed string literal")
     }
 
     def readCharLit(stream: List[Char]): (Char, List[Char]) = stream match {
       case c :: '\'' :: tail => (c, tail)
-      case _  => error("unclosed character literal")
+      case _  => sys.error("unclosed character literal")
     }
 
     stream match {
@@ -51,8 +51,8 @@ trait Reader {
       case '\n' ::  tail => readWithRest(tail)
       case '"'  ::  tail => readStringLit(tail, "\"")
       case '\'' ::  tail => readCharLit(tail)
-      case ')'  ::  _    => error("unexpected list terminator")
-      case ']'  ::  _    => error("unexpected list terminator")
+      case ')'  ::  _    => sys.error("unexpected list terminator")
+      case ']'  ::  _    => sys.error("unexpected list terminator")
       case c    ::  tail if(Character.isDigit(c)) => readNumOrMaybeSymbol(stream, negate=false)
       case '-'  :: c :: tail if(Character.isDigit(c)) => readNumOrMaybeSymbol(c :: tail, negate=true)
       case _ => readSymbol(stream)

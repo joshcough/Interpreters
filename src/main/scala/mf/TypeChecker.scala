@@ -21,7 +21,7 @@ import scalaz.syntax.monad._
  * Robby Findler's lecture notes on type inference can be found here:
  *   http://www.eecs.northwestern.edu/~robby/courses/321-2012-winter/lecture16.pdf
  *
- *   TODO: TypeChecker uses parser, but it probably shouldn't. It should just get the AST.
+ * TODO: TypeChecker uses parser, but it probably shouldn't. It should just get the AST.
  */
 object TypeChecker {
 
@@ -173,10 +173,16 @@ object TypeChecker {
   }
 
   // the top level type check function *for a single expression only*
-  def typeCheck(exp: Exp): Either[String, Type] = {
-    val a = TyVar("init")
-    val as = tp(exp, a).run(TypeCheckState(0, predef, Map()))
-    as._1.right.map(s => renameTyVars(subs(a, s)))
+  def typeCheckExp(exp: String, predef: Env): Either[String, Type] = {
+    def inner(exp: Exp, tcs: TypeCheckState): Either[String, Type] = {
+      val a = TyVar("init")
+      val as = tp(exp, a).run(tcs)
+      as._1.right.map(s => renameTyVars(subs(a, s)))
+    }
+    for {
+      e   <- Parser.parseExpr(exp)
+      res <- inner(e, TypeCheckState(0, predef, Map()))
+    } yield res
   }
 
   /**
@@ -191,9 +197,9 @@ object TypeChecker {
     i was hoping to use sequence or traverse for this.
     anyway, i have enough info here to call tp on each of expsAndTypeVars.
     so that is a start.
-  **/
-  def typeCheck(s:String): Either[String, Type] = for {
-    p <- Parser.parseExp(s)
+   */
+  def typeCheck(s:String): Either[String, TypeCheckedProgram] = for {
+    p <- Parser.parseProgram(s)
     t <- typeCheck(p)
   } yield t
 
@@ -204,34 +210,39 @@ object TypeChecker {
    * TODO: if the result is a Left or Right.
    * TODO: I should just use the subst from the result, not the state.
    */
-  def typeCheck(p: Program): Either[String, Type] = {
-    //val _ = println(p)
+  def typeCheck(p: Program, predef: Env = Map()): Either[String, TypeCheckedProgram] = {
+    // println(p)
 
-    /**
-     * TODO: i am not dealing with data defs here yet.
-     * TODO: i think i can allow forward reference pretty simply,
-     * TODO: just by keeping a map from def/datadef/cons name to type variable.
-     */
+    //TODO: i am not dealing with data defs here yet.
 
     /* make up frest type variables for each def, and the final expression */
     def tvSupply = Stream.from(0).map((i:Int) => TyVar("t" + i))
-    val etv = (p.defs.map(_.lam) ::: List(p.e)).zip(tvSupply).toList
-    //val _ = println(etv)
+    // TODO: ignoring data for now...just typing the vals.
+    val valsAndTyVars = p.body.collect{ case v: Val => v }.zip(tvSupply).toList
+    //println(valsAndTypeVars)
 
-    /**
-     * TODO: i think there is a huge problem here...im not putting the new lambdas into the env.
-     * TODO: additionally, i have no good way to name them. currently just by their params.
-     * TODO: im going to have to make a top level def, instead of just lambda
-     */
-    val s = listTraverse.sequenceS(etv.map{ case (e, tv) => tp(e, tv) }.map(_.run))
-    //val _ = println(state)
+    /* create the initial type environment */
+    val env = valsAndTyVars.map{ case (v,tv) => (v.name, tv) }.toMap
+    println("initial env: " + env)
+
+    // TODO: make sure there are no duplicate names defined...
+    // TODO: also make sure that nothing defined in the body is also in predef.
+    // TODO: maybe i should just get rid of predef altogether.
 
     /* run everything with a base state. */
-    val r = s(TypeCheckState(etv.length, predef, Map()))
+    val s = listTraverse.sequenceS(valsAndTyVars.map{ case (v, tv) => tp(v.body, tv) }.map(_.run))
+    //println(s)
+    val r = s(TypeCheckState(valsAndTyVars.length, env ++ predef, Map()))
+    val finalSubstE = r._1.last
 
     /* finally, rename all the type variables so that they look nice */
-    for{
-      subst <- r._1.last
-    } yield renameTyVars(subs(etv.last._2, subst))
+
+    def createResult(subst:Subst) = TypeCheckedProgram({
+      // TODO: this renaming might need to be fixed, because it starts over
+      // TODO: with each expression...but this might be ok. look into it.
+      valsAndTyVars.map{ case (v, tv) => (v.name, renameTyVars(subs(tv, subst))) }.toMap
+    })
+
+    for{ subst <- finalSubstE } yield createResult(subst)
   }
 }
