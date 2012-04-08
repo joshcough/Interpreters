@@ -14,7 +14,7 @@ trait ParseTestHelpers extends util.Compare { self: Properties =>
 
   def parseType(typeString: String, expectedTypeString:Option[String]=None) = compareR(
     typeString,
-    Parser.parseType(typeString).right.map(_.toString),
+    Parser.parseType(typeString).right.map(_.string),
     expectedTypeString.getOrElse(typeString)
   )
   def parseExp(code: String, expected: Exp) = compareR(code, Parser.parseExpr(code), expected)
@@ -23,6 +23,10 @@ trait ParseTestHelpers extends util.Compare { self: Properties =>
 }
 
 object TypeParserTests extends Properties("Type Parser") with ParseTestHelpers {
+  // these tests make sure that parsing the type and then
+  // running toString on it returns the original same string.
+  // TODO: i hope to generate some types with scalacheck soon
+  // TODO: generate, run toString, parse, and make sure i get back the same type.
   parseType("Int")
   parseType("Int -> Int")
   parseType("Int -> Bool -> Int")
@@ -33,8 +37,13 @@ object TypeParserTests extends Properties("Type Parser") with ParseTestHelpers {
   parseType("('t0 -> 't1) -> ('t1 -> 't2) -> 't0 -> 't2")
   parseType("(('t1 -> 't2) -> 't1 -> 't2) -> 't2")
   parseType("('t1 -> ('t2 -> 't1) -> 't2) -> 't2")
+  parseType("Maybe (Maybe Int)")
+  parseType("'t0 -> 't1 -> 't2 -> 't3 -> Maybe (Maybe (List 't3))")
+  parseType("'t0 -> Maybe 't1 -> Maybe (Maybe 't2) -> 't3 -> X 't0 (Y 't1 't2 (List 't3))")
+  parseType("Maybe (Maybe 't0) -> Int")
 }
 
+// TODO: test multi argument functions and applications
 object ExpressionParserTests extends Properties("Expression Parser") with ParseTestHelpers {
   parseExp("6",          Lit(Num(6)))
   parseExp("( x -> x )", id)
@@ -55,21 +64,16 @@ object DataParserTests extends Properties("Program Parser") with ParseTestHelper
     )
   )
 
-//  val listCon = TyCon("List", List(a))
-//  parseData("(data List ('a) ((Nil) (Cons 'a (List 'a))))",
-//    DataDef("List", List(a),
-//      List(
-//        Constructor("Nil", Nil),
-//        Constructor("Cons", List(a, listCon))
-//      )
-//    )
-//  )
+  val listCon = TyCon("List", List(a))
+  parseData("(data List ('a) ((Nil) (Cons 'a (List 'a))))",
+    DataDef("List", List(a),
+      List(
+        Constructor("Nil", Nil),
+        Constructor("Cons", List(a, listCon))
+      )
+    )
+  )
 
-  /**
-   * When type checking a DataDef I need to:
-   *   - Create a type constructor, like xCon below.
-   *   -
-   */
   val xCon = TyCon("X", List(a, b, c))
   // data X a b c = A a | B b | C c
   parseData("(data X ('a 'b 'c) ((A 'a) (B 'b) (C 'c)))",

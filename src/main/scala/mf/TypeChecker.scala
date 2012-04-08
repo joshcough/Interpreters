@@ -25,15 +25,79 @@ import scalaz.syntax.monad._
  */
 object TypeChecker {
 
-  /** Unification **/
-
-  def freshen(t:TyForall): S[Type] = {
-    // TODO: UGH! This is duplicated. ok for now, just trying to get this to compile.
-    def newTV = for (n <- modState(t => t.copy(t.tyVarCount + 1))) yield TyVar("t" + n.tyVarCount)
-    for {
-      tvs <- listTraverse.sequenceS(t.tvs.map(_ => newTV))
-    } yield t.swapAll(tvs)
+  /* Subtitutions */
+  type Subst = Map[TyVar, Type]
+  def extend(tv: TyVar, t: Type, subs: Subst): Subst = subs + (tv -> t)
+  def lookup(tv: TyVar, subs: Subst) = subs.getOrElse(tv, tv)
+  // this is 'chase', i believe.
+  def subs(t: Type, s: Subst): Type = t match {
+    case t@TyVar(_)  => if(t == lookup(t, s)) t else subs(lookup(t, s), s)
+    case TyLam(a, r) => TyLam(subs(a, s), subs(r, s))
+    case TyCon(name, tyArgs) => TyCon(name, tyArgs.map(subs(_, s)))
+    case TyForall(tvs, t) => TyForall(tvs, subs(t, s))
   }
+
+  /* Environments */
+  type TypeEnv = Map[Name, Type]
+
+  def getTVarsOfType(t: Type): Set[TyVar] = t match {
+    case t@TyVar(n)         => Set(t)
+    case TyLam(t1, t2)    => getTVarsOfType(t1) ++ getTVarsOfType(t2)
+    case TyCon(_, args)   => args.flatMap(t => getTVarsOfType(t)).toSet
+    // TODO TODOTODOTODOTODOTODOTODOTODOTODO i think this might be royally busted!
+    case TyForall(tvs, t) => getTVarsOfType(t)
+  }
+  //    for { tvs <- listTraverse.sequenceS(t.tvs.map(_ => newTV)) } yield t.swapAll(tvs)
+
+  /**
+   * State related code
+   */
+  case class TypeCheckState(tyVarCount: Int, env: TypeEnv, subst: Subst)
+  type S[T] = State[TypeCheckState, T]
+  type ETS[T] = EitherT[S, String, T]
+
+  /**
+   * get things out of the state
+   */
+
+  def mapState[T](f: TypeCheckState => T) =
+    eitherT[S, String, T](for(t <- init.map(f)) yield Right(t) : Either[String, T])
+  def getEnv   = mapState(_.env)
+  def getSubst = mapState(_.subst)
+
+  def find(id: Name, e: TypeEnv, bt: Type, s: Subst) = e.get(id).map {
+    t => mgu(subs(t, s), bt, s)
+  }.getOrElse(typeError("unknown id: " + id.name))
+
+  /**
+   * update things in the state
+   */
+
+  def modState(f: TypeCheckState => TypeCheckState) = modify[TypeCheckState](f)
+  def liftS[T](s:State[TypeCheckState,T]) =
+    eitherT[S, String, T](s.map{ t => Right(t): Either[String, T] })
+  /* get a fresh type variable, incrementing the count in the state in the process. */
+  def newTypVar: ETS[Type] =
+    liftS(for (n <- modState(t => t.copy(t.tyVarCount + 1))) yield TyVar("t" + n.tyVarCount))
+  /* update the environment in the state */
+  def updateEnv(id:Name, s:Type): ETS[TypeEnv] =
+    liftS(modState(t => t.copy(env = t.env + (id -> s))).map(_.env))
+
+  /**
+   * run a function that produces a new subst
+   * and update the state with that new subst afterwards
+   */
+  def updateSubst(f: Subst => ETS[Subst]): ETS[Subst] = {
+    /** change the subst in the state **/
+    def setSubst(newSubst: Subst): ETS[Subst] =
+      liftS(modState(t => t.copy(subst = newSubst)).map(_.subst))
+    for { s  <- getSubst; s1 <- f(s); _  <- setSubst(s1) } yield s1
+  }
+
+  def success(s: Subst): ETS[Subst] = eitherT[S, String, Subst](state(Right(s)))
+  def typeError(msg: String): ETS[Subst] = eitherT[S, String, Subst](state(Left(msg)))
+
+  /** Unification **/
 
   /**
    * Calculate the most general unifier of two types,
@@ -55,8 +119,7 @@ object TypeChecker {
       } yield s1
       case (TyVar(ta), TyVar(tb)) if ta == tb => success(s)
       /** this does the 'occurs' check for infinite types. **/
-      case (TyVar(ta), _) if (!getTVarsOfType(b).contains(ta)) =>
-        success(extend(TyVar(ta), b, s))
+      case (t@TyVar(_), _) if (!getTVarsOfType(b).contains(t)) => success(extend(t, b, s))
       case (_, TyVar(_)) => mgu(b, a, s)
       case (TyLam(a1, b1), TyLam(a2, b2)) => for {
         s1 <- mgu(b1, b2, s)
@@ -64,6 +127,7 @@ object TypeChecker {
       } yield s2
       case (TyCon(name1, args1), TyCon(name2, args2)) if name1 == name2 =>
         // TODO: find out if there is a nicer way to do this...
+        // TODO: definitely not checking if we have the same number of args here...
         args1.zip(args2).foldLeft(success(s)) {
           case (sp, (t1, t2)) =>
             for {s1 <- sp; s2 <- mgu(t1, t2, s1)} yield s2
@@ -72,58 +136,14 @@ object TypeChecker {
     }
   }
 
-  def success(s: Subst): ETS[Subst] = eitherT[S, String, Subst](state(Right(s)))
-  def typeError(msg: String): ETS[Subst] = eitherT[S, String, Subst](state(Left(msg)))
-
-  /**
-   * State related code
-   */
-  case class TypeCheckState(tyVarCount: Int, env: Env, subst: Subst)
-
-  type S[T] = State[TypeCheckState, T]
-  type ETS[T] = EitherT[S, String, T]
-
-  /**
-   * get things out of the state
-   */
-
-  def mapState[T](f: TypeCheckState => T) =
-    eitherT[S, String, T](for(t <- init.map(f)) yield Right(t) : Either[String, T])
-  def getEnv   = mapState(_.env)
-  def getSubst = mapState(_.subst)
-
-  def find(id: Name, e: Env, bt: Type, s: Subst) = e.get(id).map {
-    t => mgu(subs(t, s), bt, s)
-  }.getOrElse(typeError("unknown id: " + id.name))
-
-  /**
-   * update things in the state
-   */
-
-  def modState(f: TypeCheckState => TypeCheckState) = modify[TypeCheckState](f)
-  def liftS[T](s:State[TypeCheckState,T]) =
-    eitherT[S, String, T](s.map{ t => Right(t): Either[String, T] })
-  /* get a fresh type variable, incrementing the count in the state in the process. */
-  def newTypVar: ETS[Type] =
-    liftS(for (n <- modState(t => t.copy(t.tyVarCount + 1))) yield TyVar("t" + n.tyVarCount))
-  /* update the environment in the state */
-  def updateEnv(id:Name, s:Type): ETS[Env] =
-    liftS(modState(t => t.copy(env = t.env + (id -> s))).map(_.env))
-
-  /**
-   * run a function that produces a new subst
-   * and update the state with that new subst afterwards
-   */
-  def updateSubst(f: Subst => ETS[Subst]): ETS[Subst] = {
-    /** change the subst in the state **/
-    def setSubst(newSubst: Subst): ETS[Subst] =
-      liftS(modState(t => t.copy(subst = newSubst)).map(_.subst))
-    for { s  <- getSubst; s1 <- f(s); _  <- setSubst(s1) } yield s1
+  def freshen(t:TyForall): S[Type] = {
+    // TODO: UGH! This is duplicated. ok for now, just trying to get this to compile.
+    def newTV = for (n <- modState(t => t.copy(t.tyVarCount + 1))) yield TyVar("t" + n.tyVarCount)
+    for { tvs <- listTraverse.sequenceS(t.tvs.map(_ => newTV)) } yield t.swapAll(tvs)
   }
 
   /**
-   * Calculate the principal type scheme for an expression in a given
-   * typing environment
+   * Calculate the principal type scheme for an expression
    */
   def tp(exp: Exp, bt: Type): ETS[Subst] = {
 //    println("tp: " + (exp, bt))
@@ -173,7 +193,7 @@ object TypeChecker {
   }
 
   // the top level type check function *for a single expression only*
-  def typeCheckExp(exp: String, predef: Env): Either[String, Type] = {
+  def typeCheckExp(exp: String, predef: TypeEnv): Either[String, Type] = {
     def inner(exp: Exp, tcs: TypeCheckState): Either[String, Type] = {
       val a = TyVar("init")
       val as = tp(exp, a).run(tcs)
@@ -198,7 +218,7 @@ object TypeChecker {
     anyway, i have enough info here to call tp on each of expsAndTypeVars.
     so that is a start.
    */
-  def typeCheck(s:String): Either[String, TypeCheckedProgram] = for {
+  def typeCheck(s:String): Either[String, TypeEnv] = for {
     p <- Parser.parseProgram(s)
     t <- typeCheck(p)
   } yield t
@@ -210,38 +230,64 @@ object TypeChecker {
    * TODO: if the result is a Left or Right.
    * TODO: I should just use the subst from the result, not the state.
    */
-  def typeCheck(p: Program, predef: Env = Map()): Either[String, TypeCheckedProgram] = {
+  def typeCheck(p: Program, predef: TypeEnv = Map()): Either[String, TypeEnv] = {
     // println(p)
 
     //TODO: i am not dealing with data defs here yet.
 
+    /**
+     * When type checking a DataDef I need to:
+     * - Create a type constructor TyCon
+     * - foreach constructor * typeAgs, generate the equivalent of:
+     *   def conName = Forall tyArgs . TyLam conArg1 -> ... TyLam conArgN -> TyCon
+     */
+    def makeTyCons(d:DataDef): List[(Name, TyForall)] = {
+      val tyCon = TyCon(d.name, d.typeVars)
+      def makeTyLam(c:Constructor) = (c.name, TyForall(d.typeVars, c.arguments.foldRight[Type](tyCon){
+        case (nextArg, t) => TyLam(nextArg, t)
+      }))
+      d.constructors.map(makeTyLam)
+    }
+
+    val tylams: List[(Name, TyForall)] = p.body.collect{ case d: DataDef => d }.flatMap(makeTyCons)
+
     /* make up frest type variables for each def, and the final expression */
     def tvSupply = Stream.from(0).map((i:Int) => TyVar("t" + i))
-    // TODO: ignoring data for now...just typing the vals.
+
+
     val valsAndTyVars = p.body.collect{ case v: Val => v }.zip(tvSupply).toList
     //println(valsAndTypeVars)
 
     /* create the initial type environment */
-    val env = valsAndTyVars.map{ case (v,tv) => (v.name, tv) }.toMap
-    println("initial env: " + env)
+    // val env = valsAndTyVars.map{ case (v,tv) => (v.name, tv) }.toMap ++ tylams.toMap ++ predef
+    val env = tylams.toMap ++ predef
+    //println("initial env: " + env)
 
     // TODO: make sure there are no duplicate names defined...
     // TODO: also make sure that nothing defined in the body is also in predef.
     // TODO: maybe i should just get rid of predef altogether.
 
     /* run everything with a base state. */
-    val s = listTraverse.sequenceS(valsAndTyVars.map{ case (v, tv) => tp(v.body, tv) }.map(_.run))
+    val s = listTraverse.sequenceS(valsAndTyVars.map{ case (v, tv) =>
+      for {
+        s <- tp(v.body, tv)
+        // Top Level Defs must be generalized to Forall here!
+        val frees = getTVarsOfType(s(tv))
+        _ <- updateEnv(v.name, TyForall(frees.toList, s(tv)))
+      } yield s
+    }.map(_.run))
+
     //println(s)
-    val r = s(TypeCheckState(valsAndTyVars.length, env ++ predef, Map()))
+    val r = s(TypeCheckState(valsAndTyVars.length, env, Map()))
     val finalSubstE = r._1.last
 
     /* finally, rename all the type variables so that they look nice */
 
-    def createResult(subst:Subst) = TypeCheckedProgram({
+    // TODO: I'm not including the data defs in this!
+    def createResult(subst:Subst) =
       // TODO: this renaming might need to be fixed, because it starts over
       // TODO: with each expression...but this might be ok. look into it.
       valsAndTyVars.map{ case (v, tv) => (v.name, renameTyVars(subs(tv, subst))) }.toMap
-    })
 
     for{ subst <- finalSubstE } yield createResult(subst)
   }

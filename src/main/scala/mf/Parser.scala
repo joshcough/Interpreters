@@ -49,26 +49,26 @@ object Parser {
      * Type Parsers
      */
 
-    //TODO: not yet parsing higher kinded types. this is causing problems in data defs.
-
-    /**
-     * random notes:
-     * Haskell gives this: Maybe (Maybe Int)
-     * data Dumb = Dumb (Maybe (Maybe Int))
-     */
-
     val INTT   = "Int".r  ^^ { _ => IntT }
     val LITT   = INTT
-    // TODO: not supporting arguments to tycon yet...
-    val TYCON  = CONS_ID ^^ { s => TyCon(s, Nil) }
+    /**
+     * important case to consider: Maybe (Maybe 't0) -> Int
+     * this is really (Maybe (Maybe 't0)) -> Int
+     * see ParserTests for more details.
+     */
+    val TYCON_BODY  = (CONS_ID ~ ((LITT | TYVAR | parens(TYPE))*)) ^^ { case s ~ args => TyCon(s, args) }
+    val TYCON = parens(TYCON_BODY) | TYCON_BODY
     val TYVAR  = """'[a-z]([0-9])*""".r ^^ { s => TyVar(s.drop(1)) }
-    //('t0 -> 't1) -> ('t1 -> 't2) -> 't0 -> 't2"
-    //(('t1 -> 't2) -> 't1 -> 't2) -> 't2
+    /**
+     * Important tricky cases to consider:
+     * /('t0 -> 't1) -> ('t1 -> 't2) -> 't0 -> 't2"
+     * (('t1 -> 't2) -> 't1 -> 't2) -> 't2
+     */
     def TYLAM  = ((LITT | TYCON | TYVAR) ~ "->" ~ TYPE) ^^ { case in ~ "->" ~ out => TyLam(in, out) }
     def TYLAM_PARENS: Parser[TyLam] = parens(TYLAM | TYLAM_PARENS) ~ opt("->" ~> TYPE) ^^ {
       case in ~ maybeOut => maybeOut.map(TyLam(in, _)).getOrElse(in)
     }
-    def TYPE: Parser[Type] = TYLAM_PARENS | TYLAM | LITT | TYCON | TYVAR
+    def TYPE: Parser[Type] = TYLAM_PARENS | TYLAM | TYCON | LITT | TYVAR
 
     def parseData(s:String) = parseToEither(s, DATA)
     def parseType(s:String) = parseToEither(s, TYPE)
