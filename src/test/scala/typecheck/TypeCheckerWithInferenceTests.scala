@@ -1,17 +1,19 @@
 package typecheck
 
-import TypeCheckerWithInference._
+import TypeChecker._
 
 import org.scalacheck.Prop._
 import org.scalacheck.Properties
+import typecheck.TypeCheckerWithInferenceAST._
 
+// TODO: make these tests run against all the type checkers, where possible.
 object TypeCheckerWithInferenceTests extends Properties("TypeCheckerWithExplicitTypes"){
 
   def typeCheck(exp:Exp, expected:Type) = {
     property(exp.toString) = secure {
-      val result = TypeCheckerWithInference.typeCheck(exp)
-      if(result != expected) println("expected: " + expected + ", got: " + result)
-      result == expected
+      val result = TypeChecker.typeCheck(exp)
+      if(result != Right(expected)) println("expected: " + Right(expected) + ", got: " + result)
+      result == Right(expected)
     }
   }
 
@@ -19,13 +21,14 @@ object TypeCheckerWithInferenceTests extends Properties("TypeCheckerWithExplicit
   typeCheck(Lit(Bool(true)), boolCon)
   typeCheck(Lit(Bool(false)), boolCon)
 
-//  typeCheck(Var('x), NumT, List((Var('x), NumT)))
+//  typeCheck(Id('x), NumT, List((Id('x), NumT)))
 //    (test/exn
 //      (real-type-check-expr (id 'x) (list (idtype 'y NumT)))
 //      "type-error unknown id")
 //
 
-  typeCheck(App(App(Var("=="), Lit(Num(7))), Lit(Num(8))), boolCon)
+    typeCheck(App(Id("identity"), Lit(Num(7))), numCon)
+    typeCheck(App(App(Id("=="), Lit(Num(7))), Lit(Num(8))), boolCon)
 //    (test/exn (type-check-expr (eql (bool #t)Num(8)))
 //    "eql: type-error expected: NumT in position 1, but found: (boolT)")
 
@@ -40,8 +43,8 @@ object TypeCheckerWithInferenceTests extends Properties("TypeCheckerWithExplicit
 //      (type-check-expr (ifthenelse (bool #t) Num(8)(bool #f)))
 //    "type-error expected same types in 2nd and 3rd positions but got (NumT (boolT))")
 
-  typeCheck(App(App(Var("+"), Lit(Num(7))), Lit(Num(8))), numCon)
-  typeCheck(App(App(Var("-"), Lit(Num(7))), Lit(Num(8))), numCon)
+  typeCheck(App(App(Id("+"), Lit(Num(7))), Lit(Num(8))), numCon)
+  typeCheck(App(App(Id("-"), Lit(Num(7))), Lit(Num(8))), numCon)
 
 //    "add: type-error expected: NumT in position 1, but found: (boolT)")
 //    (test/exn (type-check-expr (sub (bool #t) Num(7)))
@@ -56,10 +59,10 @@ object TypeCheckerWithInferenceTests extends Properties("TypeCheckerWithExplicit
   // (f g -> (g (f x))
   // f = t0 -> t1, g = t1 -> t2, x = t0
   val composeAst =
-    Lam("f",
-      Lam("g",
-        Lam ("x",
-          App(Var("g"), App(Var("f"), Var ("x"))))))
+    Lam(Id("f"),
+      Lam(Id("g"),
+        Lam (Id("x"),
+          App(Id("g"), App(Id("f"), Id("x"))))))
 
   typeCheck(composeAst,
     TyLam(
@@ -69,26 +72,26 @@ object TypeCheckerWithInferenceTests extends Properties("TypeCheckerWithExplicit
 
   // (x -> (+ 5 5))
   typeCheck(
-    Lam("x", App(App(Var("+"), Lit(Num(5))), Lit(Num(5)))),
+    Lam(Id("x"), App(App(Id("+"), Lit(Num(5))), Lit(Num(5)))),
     TyLam(TyVar("t0"), numCon)
   )
-  typeCheck(App(App(Var("+"), Lit(Num(5))), Lit(Num(5))), numCon)
+  typeCheck(App(App(Id("+"), Lit(Num(5))), Lit(Num(5))), numCon)
 
   // (x -> (+ x 5))
   typeCheck(
-    Lam("x", App(App(Var("+"), Var("x")), Lit(Num(5)))),
+    Lam(Id("x"), App(App(Id("+"), Id("x")), Lit(Num(5)))),
     TyLam(numCon, numCon)
   )
 
   // (x y z -> (+ x 5))
   typeCheck(
-    Lam("x", Lam("y", Lam("z", App(App(Var("+"), Var("x")), Lit(Num(5)))))),
+    Lam(Id("x"), Lam(Id("y"), Lam(Id("z"), App(App(Id("+"), Id("x")), Lit(Num(5)))))),
     TyLam(numCon, TyLam(TyVar("t0"), TyLam(TyVar("t1"), numCon)))
   )
 
   // (x y z -> (== z (+ z y)))
   typeCheck(
-    Lam("x", Lam("y", Lam("z", App(App(Var("=="), Var("z")), App(App(Var("+"), Var("x")), Var("y")))))),
+    Lam(Id("x"), Lam(Id("y"), Lam(Id("z"), App(App(Id("=="), Id("z")), App(App(Id("+"), Id("x")), Id("y")))))),
     TyLam(numCon, TyLam(numCon, TyLam(numCon, boolCon)))
   )
 

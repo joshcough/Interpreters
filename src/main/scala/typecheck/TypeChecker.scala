@@ -30,12 +30,12 @@ object TypeChecker {
   // Calculate the most general unifier of two types,
   // raising a UnificationError if there isn't one
   def mgu(a: Type, b: Type, s: Subst): Either[String, Subst] = {
-    //println("calculating mgu for: " + (a, b, s))
+//    println("calculating mgu for: " + (a, b, s))
     val result = (subs(a, s), subs(b, s)) match {
       case (TyVar(ta), TyVar(tb)) if ta == tb => success(s)
       // this does the 'occurs' check for infinite types.
       case (TyVar(ta), _) if (!getTVarsOfType(b).contains(ta)) =>
-        success(extend(ta, b, s))
+        success(extend(TyVar(ta), b, s))
       case (_, TyVar(_)) => mgu(b, a, s)
       case (TyLam(a1, b1), TyLam(a2, b2)) => for {
         s1 <- mgu(b1, b2, s)
@@ -49,7 +49,7 @@ object TypeChecker {
         }
       case (x, y) => typeError("unable to unify: " +(x, y))
     }
-    //println("mgu = " + result)
+//    println("mgu = " + result)
     result
   }
 
@@ -75,15 +75,27 @@ object TypeChecker {
   }.getOrElse(typeError("unknown id: " + id.name))
 
   // update things in the state
+  // TODO: all this eitherT crap really needs cleaning up.
   def modState(f: TypeCheckState => TypeCheckState) = modify[TypeCheckState](f)
   def newTypVar: ETS[Type] = {
-    val next = for (n <- modState(t => t.copy(t.tyVarCount + 1))) yield TyVar("t" + n)
+    val next = for (n <- modState(t => t.copy(t.tyVarCount + 1))) yield TyVar("t" + n.tyVarCount)
     eitherT[S, String, Type](next.map(t => (Right(t): Either[String, Type])))
   }
-  def updateEnv(id:Id, scheme:TyScheme) = mapState(t => t.copy(env = t.env + (id -> scheme)))
-  def updateSubst(f: Subst => ETS[Subst]) = {
-    def setSubst(newSubst: Subst) = mapState(t => t.copy(subst = newSubst))
-    for { s  <- getSubst; s1 <- f(s); _  <- setSubst(s1) } yield s1
+  def updateEnv(id:Id, scheme:TyScheme): ETS[Env] =
+    eitherT[S, String, Env](
+      modState(t => t.copy(env = t.env + (id -> scheme))).map(t => (Right(t.env): Either[String, Env]))
+    )
+  def updateSubst(f: Subst => ETS[Subst]): ETS[Subst] = {
+    //def setSubst(newSubst: Subst) = modState(t => t.copy(subst = newSubst))
+    def setSubst(newSubst: Subst) =
+      eitherT[S, String, Subst](
+        modState(t => t.copy(subst = newSubst)).map(t => (Right(t.subst): Either[String, Subst]))
+      )
+    for {
+      s  <- getSubst
+      s1 <- f(s)
+      _  <- setSubst(s1)
+    } yield s1
   }
 
   /**
@@ -91,6 +103,7 @@ object TypeChecker {
    * typing environment
    */
   def tp(exp: Exp, bt: Type): ETS[Subst] = {
+//    println("tp: " + (exp, bt))
     implicit def unitE(e: Either[String, Subst]): ETS[Subst] = eitherT[S, String, Subst](state(e))
     exp match {
       case Lit(v) => updateSubst(mgu(litToTy(v), bt, _))
@@ -130,28 +143,41 @@ object TypeChecker {
     helper(t)((0, Map[String, String]()))._1
   }
 
-  // the top level type check function
+  // the top level type check function *for a single expression only*
   def typeCheck(exp: Exp): Either[String, Type] = {
     val a = TyVar("init")
-    tp(exp, a).run(TypeCheckState(0, predef, Map()))._1.right.map(s => renameTyVars(subs(a, s)))
+    val as = tp(exp, a).run(TypeCheckState(0, predef, Map()))
+//    println(as)
+    as._1.right.map(s => renameTyVars(subs(a, s)))
   }
-  
-//  def typeCheck(s:String): Either[String, Type] = {
-//    def liftEP(e: Either[String, Program]): ETS[Program] = eitherT[S, String, Program](state(e))
-//    val x = for {
-//      p <- liftEP(Parser.parse(s))
-//      val tvs = p.exps.zip(Stream.from(0).map((i:Int) => TyVar("t" + i))).toList
-//      res <- listTraverse.traverseS(tvs){ t =>
-//        tp(t._1, t._2)
-//      }
-//    } yield res
-//
-//    //def traverseS[S, A, B](fa : F[A])(f : scala.Function1[A, scalaz.State[S, B]]) : scalaz.State[S, F[B]]
-//    eitherMonad.traverseS()
-//
-//    sys.error("todo")
-//  }
+
+//  typeCheck(App(App(Id("=="), Lit(Num(7))), Lit(Num(8))), boolCon)
+
+
+
+  // i need to take each of my expressions and its type variable
+  // and run that through tp. this will give back an
+  // EitherT[State[TypeCheckState, Subst], String, Subst]
+  // i think something is most definitely wrong with that type,
+  // but i'll come back to that later.
+  // the idea is to run them all, and get back a bunch of state objects,
+  // but im not sure how to do that yet.
+  // once i have the state objects, i can chain them all together.
+  // i was hoping to use sequence or traverse for this.
+
+  // anyway, i have enough info here to call tp on each of expsAndTypeVars.
+  // so that is a start.
+  def typeCheck(s:String): Either[String, Type] = for {
+    p <- Parser.parse(s)
+    val _ = println(p)
+    // make up frest type variables for each exp
+    val etv = p.exps.zip(Stream.from(0).map((i:Int) => TyVar("t" + i))).toList
+    val _ = println(etv)
+    val state = listTraverse.sequenceS(etv.map{ case (e, tv) => tp(e, tv) }.map(_.run))
+    val _ = println(state)
+    val r = state(TypeCheckState(etv.length, predef, Map()))
+    val _ = println(r)
+    val mainTypeVar = etv.last._2
+    val mainSubst = r._2.subst
+  } yield renameTyVars(subs(mainTypeVar, mainSubst))
 }
-
-
-//def unit[T](t: T): ETS[T] = eitherT[S, String, T](state(Right(t)))

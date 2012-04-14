@@ -16,18 +16,24 @@ object TypeCheckerWithInferenceAST {
 
   // Type Tree
   trait Type
-  case class TyLam(f:Type, arg:Type) extends Type
-  case class TyVar(name:String) extends Type
-  case class TyCon(name:String, args: List[Type]) extends Type
+  case class TyLam(f:Type, arg:Type) extends Type {
+    override def toString = f.toString + " -> " + arg.toString
+  }
+  case class TyVar(name:String) extends Type {
+    override def toString = "'" + name
+  }
+  case class TyCon(name:String, args: List[Type]) extends Type {
+    override def toString = name
+  }
 
   case class Program(exps: List[Exp])
 
   // Subtitutions
-  type Subst = Map[String, Type]
-  def extend(v:String, t:Type, subs: Subst): Subst = subs + (v -> t)
-  def lookup(v:String, subs:Subst) = subs.getOrElse(v, TyVar(v))
+  type Subst = Map[TyVar, Type]
+  def extend(tv:TyVar, t:Type, subs: Subst): Subst = subs + (tv -> t)
+  def lookup(tv:TyVar, subs:Subst) = subs.getOrElse(tv, tv)
   def subs(t:Type, s:Subst): Type = t match {
-    case TyVar(n)    => if(t == lookup(n, s)) t else subs(lookup(n, s), s)
+    case t@TyVar(_)  => if(t == lookup(t, s)) t else subs(lookup(t, s), s)
     case TyLam(a, r) => TyLam(subs(a, s), subs(r, s))
     case TyCon(name, tyArgs) => TyCon(name, tyArgs.map(subs(_, s)))
   }
@@ -53,6 +59,8 @@ object TypeCheckerWithInferenceAST {
   }
 
   val predef: Env = Map(
+    // TODO: notice that identity is not polymorphic.
+    Id("identity") -> (TyLam(numCon, numCon), Set()),
     Id("+")   -> (TyLam(numCon, TyLam(numCon, numCon)), Set()),
     Id("-")   -> (TyLam(numCon, TyLam(numCon, numCon)), Set()),
     Id("==")  -> (TyLam(numCon, TyLam(numCon, boolCon)), Set()),

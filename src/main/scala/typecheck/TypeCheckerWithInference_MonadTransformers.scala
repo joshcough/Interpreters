@@ -33,7 +33,7 @@ object TypeCheckerWithInference_MonadTransformers {
       case (TyVar(ta), TyVar(tb)) if ta == tb => success(s)
       // this does the 'occurs' check for infinite types.
       case (TyVar(ta), _) if (!getTVarsOfType(b).contains(ta)) =>
-        success(extend(ta, b, s))
+        success(extend(TyVar(ta), b, s))
       case (_, TyVar(_)) => mgu(b, a, s)
       case (TyLam(a1, b1), TyLam(a2, b2)) => for {
         s1 <- mgu(b1, b2, s)
@@ -105,7 +105,7 @@ object TypeCheckerWithInference_MonadTransformers {
   // the top level type check function
   def typeCheck(exp: Exp): Either[String, Type] = {
     val a = TyVar("init")
-    tp(predef, exp, a, Map()).run(0)._1.right.map(s => renameTyVars(subs(a, s)))
+    for{ s <- tp(predef, exp, a, Map()).run(0)._1 } yield renameTyVars(subs(a, s))
   }
 }
 

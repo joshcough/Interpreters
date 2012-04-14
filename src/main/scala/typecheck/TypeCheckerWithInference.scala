@@ -45,7 +45,7 @@ object TypeCheckerWithInference {
       case (TyVar(ta), TyVar(tb)) if ta == tb => s
       // this does the 'occurs' check for infinite types.
       case (TyVar(ta), _) if (! getTVarsOfType(b).contains(ta)) =>
-        extend(ta, b, s)
+        extend(TyVar(ta), b, s)
       case (_, TyVar(_)) => mgu(b, a, s)
       case (TyLam(a1, b1), TyLam(a2, b2)) => mgu(a1, a2, mgu(b1, b2, s))
       case (TyCon(name1, args1), TyCon(name2, args2)) if name1 == name2 =>
