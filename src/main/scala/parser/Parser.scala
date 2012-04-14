@@ -19,10 +19,14 @@ object Parser {
     val ID   = """[a-zA-Z]([a-zA-Z0-9]|_[a-zA-Z0-9])*""".r ^^ { s => Id(s) }
     // TODO: these are kind of bogus...figure out a better way.
     val OP   = ("+" | "-" | "*" | "/" | "==")  ^^ { s => Id(s) }
-    // TODO: allow for multiple argument lambdas
-    def LAM  = parens(ID ~ "->" ~ EXPR) ^^ { case id ~ "->" ~ exp => Lam(id, exp) }
-    // TODO: allow for application of more than one argument at a time.
-    def APP  = parens(EXPR ~ EXPR)      ^^ { case f ~ a => App(f, a) }
+    //(x y z -> (+ (+ x y) z)) = (x -> (y -> (z -> (+ (+ x y) z))))
+    def LAM  = parens((ID+) ~ "->" ~ EXPR) ^^ { case ids ~ "->" ~ exp =>
+      ids.init.foldRight(Lam(ids.last, exp)){ case (nextId, fun) => Lam(nextId, fun) }
+    }
+    //(f a b c d) = ((((f a) b) c) d)
+    def APP  = parens(EXPR ~ (EXPR+))     ^^ { case f ~ args =>
+      args.tail.foldLeft(App(f, args.head)){ case (fun, nextArg) => App(fun, nextArg)}
+    }
     def EXPR: Parser[Exp] = BOOL | NUM  | ID | OP | LAM | APP
 
     // this is terrible, but whatever, it works for now
