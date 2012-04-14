@@ -6,16 +6,22 @@ import scalaz.EitherT._
 import scalaz.std.either._
 import scalaz.syntax.monad._
 
+// TODO: add a type parser.
+// TODO: the top level lambdas need to be defs, not just raw lambdas.
 object Parser {
 
   object Inner extends RegexParsers {
     def parens[T](p:Parser[T]):Parser[T] = "(" ~> p <~ ")"
 
-    val ID   = """[a-zA-Z]([a-zA-Z0-9]|_[a-zA-Z0-9])*""".r ^^ { s => Id(s) }
-    val OP   = ("+" | "-" | "*" | "/")  ^^ { s => Id(s) }
     val NUM  = """[1-9][0-9]*""".r      ^^ { s => Lit(Num (s.toInt)) }
     val BOOL = ("true" | "false")       ^^ { s => Lit(Bool(s.toBoolean)) }
+    // TODO: allow ' (prime)... ex: x'
+    val ID   = """[a-zA-Z]([a-zA-Z0-9]|_[a-zA-Z0-9])*""".r ^^ { s => Id(s) }
+    // TODO: these are kind of bogus...figure out a better way.
+    val OP   = ("+" | "-" | "*" | "/" | "==")  ^^ { s => Id(s) }
+    // TODO: allow for multiple argument lambdas
     def LAM  = parens(ID ~ "->" ~ EXPR) ^^ { case id ~ "->" ~ exp => Lam(id, exp) }
+    // TODO: allow for application of more than one argument at a time.
     def APP  = parens(EXPR ~ EXPR)      ^^ { case f ~ a => App(f, a) }
     def EXPR: Parser[Exp] = BOOL | NUM  | ID | OP | LAM | APP
 
@@ -37,6 +43,7 @@ object Parser {
   def parse(s:String): Either[String, Program] = Inner.run(s)
 
   // tests for parsing this stuff
+  // TODO: put these in a real test.
   def main(args:Array[String]) {
     def doParse(s:String) = parse(s) match {
       case Left(err) => sys.error(err)

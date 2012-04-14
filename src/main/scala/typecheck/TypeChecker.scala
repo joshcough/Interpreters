@@ -169,14 +169,17 @@ object TypeChecker {
   // so that is a start.
   def typeCheck(s:String): Either[String, Type] = for {
     p <- Parser.parse(s)
-    val _ = println(p)
+    //val _ = println(p)
     // make up frest type variables for each exp
     val etv = p.exps.zip(Stream.from(0).map((i:Int) => TyVar("t" + i))).toList
-    val _ = println(etv)
+    //val _ = println(etv)
+    // TODO: i think there is a huge problem here...im not putting the new lambdas into the env.
+    // TODO: additionally, i have no good way to name them. currently just by their params.
+    // TODO: im going to have to make a top level def, instead of just lambda
     val state = listTraverse.sequenceS(etv.map{ case (e, tv) => tp(e, tv) }.map(_.run))
-    val _ = println(state)
+    //val _ = println(state)
     val r = state(TypeCheckState(etv.length, predef, Map()))
-    val _ = println(r)
+    //val _ = println(r)
     val mainTypeVar = etv.last._2
     val mainSubst = r._2.subst
   } yield renameTyVars(subs(mainTypeVar, mainSubst))

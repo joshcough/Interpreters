@@ -7,7 +7,7 @@ import org.scalacheck.Properties
 import typecheck.TypeCheckerWithInferenceAST._
 
 // TODO: make these tests run against all the type checkers, where possible.
-object TypeCheckerWithInferenceTests extends Properties("TypeCheckerWithExplicitTypes"){
+object TypeCheckerWithInferenceTests extends Properties("TypeCheckerWithInference"){
 
   def typeCheck(exp:Exp, expected:Type) = {
     property(exp.toString) = secure {
