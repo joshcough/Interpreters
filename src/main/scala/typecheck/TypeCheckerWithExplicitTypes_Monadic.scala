@@ -22,10 +22,10 @@ object TypeCheckerWithExplicitTypes_Monadic {
     // make sure the first branch is a boolean and then
     // make sure the second and third branches have the same type
     case If(tst, texp, fexp) => for {
-      t <- typeCheck(tst, env)
-      _ <- compare(t, boolT, boolT, "if required bool in test position, but got: " + t)
-      lt <- typeCheck(texp, env)
-      rt <- typeCheck(fexp, env)
+      t   <- typeCheck(tst, env)
+      _   <- compare(t, boolT, boolT, "if required bool in test position, but got: " + t)
+      lt  <- typeCheck(texp, env)
+      rt  <- typeCheck(fexp, env)
       res <- compare(lt, rt, lt, "if branches not the same type, got: " +(lt, rt))
     } yield res
     case Fun(arg, argType, body) => for {
@@ -35,8 +35,8 @@ object TypeCheckerWithExplicitTypes_Monadic {
     // then make sure that the arguments match the explicit declarations
     case App(operator, operand) => for {
       operatorType <- typeCheck(operator, env)
-      operandType <- typeCheck(operand, env)
-      res <- operatorType match {
+      operandType  <- typeCheck(operand, env)
+      res          <- operatorType match {
         case TyLam(argType, resultType) =>
           compare(argType, operandType, resultType,
             "function expected arg of type: " + argType + ", but got: " + operandType)

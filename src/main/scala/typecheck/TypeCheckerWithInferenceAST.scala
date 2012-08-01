@@ -43,7 +43,7 @@ object TypeCheckerWithInferenceAST {
 
   // this is 'chase', i believe.
   def subs(t: Type, s: Subst): Type = t match {
-    case t@TyVar(_) => if (t == lookup(t, s)) t else subs(lookup(t, s), s)
+    case t@TyVar(_)  => if (t == lookup(t, s)) t else subs(lookup(t, s), s)
     case TyLam(a, r) => TyLam(subs(a, s), subs(r, s))
     case TyCon(name, tyArgs) => TyCon(name, tyArgs.map(subs(_, s)))
   }
@@ -51,7 +51,7 @@ object TypeCheckerWithInferenceAST {
   // newTv had better be fresh here...
   // it had better not be captured by tvs in the forall.
   def swapTyVars(t: Type, oldTv: TyVar, newTv: TyVar): Type = t match {
-    case t@TyVar(_) => if (t == oldTv) newTv else t
+    case t@TyVar(_)  => if (t == oldTv) newTv else t
     case TyLam(a, r) => TyLam(swapTyVars(a, oldTv, newTv), swapTyVars(r, oldTv, newTv))
     case TyCon(name, tyArgs) => TyCon(name, tyArgs.map(swapTyVars(_, oldTv, newTv)))
   }
@@ -65,11 +65,11 @@ object TypeCheckerWithInferenceAST {
     case TyCon(_, args) => args.flatMap(t => getTVarsOfType(t)).toSet
   }
 
-  val IntT = TyCon("Int", Nil)
+  val IntT  = TyCon("Int", Nil)
   val BoolT = TyCon("Bool", Nil)
 
   def litToTy(l: Literal): Type = l match {
-    case Num(_) => IntT
+    case Num(_)  => IntT
     case Bool(_) => BoolT
   }
 

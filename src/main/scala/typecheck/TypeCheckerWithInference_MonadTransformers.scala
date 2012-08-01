@@ -65,22 +65,23 @@ object TypeCheckerWithInference_MonadTransformers {
 
   def tp(env: Env, exp: Exp, bt: Type, s: Subst): ETSSubst = {
     def liftES(e: Either[String, Subst]): ETSSubst = eitherT[S, String, Subst](state(e))
-    def newTypVar: ETSType = eitherT[S, String, Type]((for (n <- modify[Int](_ + 1)) yield
-      TyVar("t" + n)).map(t => (Right(t): Either[String, Type])))
+    def newTypVar: ETSType = eitherT[S, String, Type](
+      (for (_ <- modify[Int](_ + 1); n <- get) yield TyVar("t" + n)).map(t =>
+        (Right(t): Either[String, Type])))
     exp match {
       case Lit(v) => liftES(mgu(litToTy(v), bt, s))
       case i@Name(n) => liftES(env.get(i).map {
         t => mgu(subs(t, s), bt, s)
       }.getOrElse(Left("unknown id: " + n)))
       case Lam(x, e) => for {
-        a <- newTypVar
-        b <- newTypVar
-        s1 <- liftES(mgu(bt, TyLam(a, b), s))
+        a   <- newTypVar
+        b   <- newTypVar
+        s1  <- liftES(mgu(bt, TyLam(a, b), s))
         res <- tp(env + (x -> a), e, b, s1)
       } yield res
       case App(e1, e2) => for {
-        a <- newTypVar
-        f <- tp(env, e1, TyLam(a, bt), s)
+        a   <- newTypVar
+        f   <- tp(env, e1, TyLam(a, bt), s)
         res <- tp(env, e2, a, f)
       } yield res
     }

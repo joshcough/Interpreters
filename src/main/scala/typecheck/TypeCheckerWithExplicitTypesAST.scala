@@ -24,16 +24,16 @@ object TypeCheckerWithExplicitTypesAST {
   val boolT = TyCon("Bool", Nil)
 
   def litToTy(l: Literal): Type = l match {
-    case Num(_) => numT
+    case Num(_)  => numT
     case Bool(_) => boolT
   }
 
   val predef: TypeEnv = Map(
-    "+" -> (TyLam(numT, TyLam(numT, numT))),
-    "-" -> (TyLam(numT, TyLam(numT, numT))),
-    "==" -> (TyLam(numT, TyLam(numT, boolT))),
+    "+"   -> (TyLam(numT, TyLam(numT, numT))),
+    "-"   -> (TyLam(numT, TyLam(numT, numT))),
+    "=="  -> (TyLam(numT, TyLam(numT, boolT))),
     "and" -> (TyLam(boolT, TyLam(boolT, boolT))),
-    "or" -> (TyLam(boolT, TyLam(boolT, boolT)))
+    "or"  -> (TyLam(boolT, TyLam(boolT, boolT)))
     // TODO: how do we do if? is it like this?
     //"if" ->  (TyLam(boolT,  .. ....  Set("a"))
     //  tv => "if" -> (TyLam(boolT, TyLam(tv, TyLam(tv, tv))), Set())

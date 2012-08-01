@@ -34,9 +34,9 @@ object TypeCheckerWithExplicitTypes_V1 {
 
   // the real type check function, which works with the type environment.
   def typeCheck(expr: Tree, env: TypeEnv = Nil): Type = expr match {
-    case Num(n) => NumT
-    case Bool(b) => BoolT
-    case Id(x) => env.find(_._1 == x).map(_._2).getOrElse(sys.error("not found: " + x))
+    case Num(n)    => NumT
+    case Bool(b)   => BoolT
+    case Id(x)     => env.find(_._1 == x).map(_._2).getOrElse(sys.error("not found: " + x))
     case Add(l, r) => mathTypeCheck(l, r, env, NumT, "add")
     case Sub(l, r) => mathTypeCheck(l, r, env, NumT, "sub")
     case Eql(l, r) => mathTypeCheck(l, r, env, BoolT, "add")
