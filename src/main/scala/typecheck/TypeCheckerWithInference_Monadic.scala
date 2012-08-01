@@ -64,18 +64,18 @@ object TypeCheckerWithInference_Monadic {
       if (r._2.contains(k)) r else (r._1 + 1, r._2 + (k -> ("t" + r._1)))
     def helper(t: Type): State[R, Type] = t match {
       case TyVar(oldName) =>
-        for {z <- modify[R](update(oldName, _))} yield TyVar(z._2(oldName))
+        for {_ <- modify[R](update(oldName, _)); z <- get} yield TyVar(z._2(oldName))
       case TyLam(a, b) =>
         for {t1 <- helper(a); t2 <- helper(b)} yield TyLam(t1, t2)
       case TyCon(name, tyArgs) =>
         for {ts <- listTraverse.traverseS(tyArgs)(helper(_))} yield TyCon(name, ts)
     }
-    helper(t)((0, Map[String, String]()))._1
+    helper(t)((0, Map[String, String]()))._2
   }
 
   // the top level type check function
   def typeCheck(exp: Exp): Type = {
     val a = TyVar("init")
-    renameTyVars(subs(a, tp(predef, exp, a, Map())(0)._1))
+    renameTyVars(subs(a, tp(predef, exp, a, Map())(0)._2))
   }
 }

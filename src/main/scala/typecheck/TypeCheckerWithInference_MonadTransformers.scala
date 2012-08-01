@@ -58,8 +58,8 @@ object TypeCheckerWithInference_MonadTransformers {
   // Calculate the principal type scheme for an expression in a given
   // typing environment
 
-  type S[T] = State[Int, T]
-  type ETS[T] = EitherT[S, String, T]
+  type S[+T] = State[Int, T]
+  type ETS[+T] = EitherT[S, String, T]
   type ETSType = ETS[Type]
   type ETSSubst = ETS[Subst]
 
@@ -94,19 +94,19 @@ object TypeCheckerWithInference_MonadTransformers {
       if (r._2.contains(k)) r else (r._1 + 1, r._2 + (k -> ("t" + r._1)))
     def helper(t: Type): State[R, Type] = t match {
       case TyVar(oldName) =>
-        for {z <- modify[R](update(oldName, _))} yield TyVar(z._2(oldName))
+        for {_ <- modify[R](update(oldName, _)); z <- get} yield TyVar(z._2(oldName))
       case TyLam(a, b) =>
         for {t1 <- helper(a); t2 <- helper(b)} yield TyLam(t1, t2)
       case TyCon(name, tyArgs) =>
         for {ts <- listTraverse.traverseS(tyArgs)(helper(_))} yield TyCon(name, ts)
     }
-    helper(t)((0, Map[String, String]()))._1
+    helper(t)((0, Map[String, String]()))._2
   }
 
   // the top level type check function
   def typeCheck(exp: Exp): Either[String, Type] = {
     val a = TyVar("init")
-    for {s <- tp(predef, exp, a, Map()).run(0)._1} yield renameTyVars(subs(a, s))
+    for {s <- tp(predef, exp, a, Map()).run(0)._2} yield renameTyVars(subs(a, s))
   }
 }
 

@@ -52,9 +52,11 @@ object TypeChecker {
   /**
    * State related code
    */
-  case class TypeCheckState(tyVarCount: Int, env: TypeEnv, subst: Subst)
-  type S[T] = State[TypeCheckState, T]
-  type ETS[T] = EitherT[S, String, T]
+  case class TypeCheckState(tyVarCount: Int, env: TypeEnv, subst: Subst){
+    def bump = this.copy(tyVarCount = tyVarCount + 1)
+  }
+  type S[+T] = State[TypeCheckState, T]
+  type ETS[+T] = EitherT[S, String, T]
 
   /**
    * get things out of the state
@@ -73,15 +75,17 @@ object TypeChecker {
    * update things in the state
    */
 
-  def modState(f: TypeCheckState => TypeCheckState) = modify[TypeCheckState](f)
+  def modAndGet[T](f: T => T): State[T, T] = for { _ <- modify(f); t <- get } yield t
+  def modAndGetType = modAndGet[TypeCheckState] _
+    
   def liftS[T](s:State[TypeCheckState,T]) =
     eitherT[S, String, T](s.map{ t => Right(t): Either[String, T] })
   /* get a fresh type variable, incrementing the count in the state in the process. */
-  def newTypVar: ETS[Type] =
-    liftS(for (n <- modState(t => t.copy(t.tyVarCount + 1))) yield TyVar("t" + n.tyVarCount))
+  def newTypVar: ETS[Type] = liftS(for (n <- modAndGetType(_.bump)) yield TyVar("t" + n.tyVarCount))
+
   /* update the environment in the state */
   def updateEnv(id:Name, s:Type): ETS[TypeEnv] =
-    liftS(modState(t => t.copy(env = t.env + (id -> s))).map(_.env))
+    liftS(modAndGetType(t => t.copy(env = t.env + (id -> s))).map(_.env))
 
   /**
    * run a function that produces a new subst
@@ -90,7 +94,7 @@ object TypeChecker {
   def updateSubst(f: Subst => ETS[Subst]): ETS[Subst] = {
     /** change the subst in the state **/
     def setSubst(newSubst: Subst): ETS[Subst] =
-      liftS(modState(t => t.copy(subst = newSubst)).map(_.subst))
+      liftS(modAndGetType(t => t.copy(subst = newSubst)).map(_.subst))
     for { s  <- getSubst; s1 <- f(s); _  <- setSubst(s1) } yield s1
   }
 
@@ -138,7 +142,7 @@ object TypeChecker {
 
   def freshen(t:TyForall): S[Type] = {
     // TODO: UGH! This is duplicated. ok for now, just trying to get this to compile.
-    def newTV = for (n <- modState(t => t.copy(t.tyVarCount + 1))) yield TyVar("t" + n.tyVarCount)
+    def newTV = for (n <- modAndGetType(t => t.copy(t.tyVarCount + 1))) yield TyVar("t" + n.tyVarCount)
     for { tvs <- listTraverse.sequenceS(t.tvs.map(_ => newTV)) } yield t.swapAll(tvs)
   }
 
@@ -179,7 +183,7 @@ object TypeChecker {
       if (r._2.contains(k)) r else (r._1 + 1, r._2 + (k -> ("t" + r._1)))
     def helper(t: Type): State[R, Type] = t match {
       case TyVar(oldName) =>
-        for {z <- modify[R](update(oldName, _))} yield TyVar(z._2(oldName))
+        for {z <- modAndGet[R](update(oldName, _))} yield TyVar(z._2(oldName))
       case TyLam(a, b) =>
         for {t1 <- helper(a); t2 <- helper(b)} yield TyLam(t1, t2)
       case TyCon(name, tyArgs) =>
@@ -189,7 +193,7 @@ object TypeChecker {
 //        val newTvs = listTraverse.sequenceS(tvs.map)
 //        for {ts <- listTraverse.traverseS(tyArgs)(helper(_))} yield TyCon(name, ts)
     }
-    helper(t)((0, Map[String, String]()))._1
+    helper(t)((0, Map[String, String]()))._2
   }
 
   // the top level type check function *for a single expression only*
@@ -197,7 +201,7 @@ object TypeChecker {
     def inner(exp: Exp, tcs: TypeCheckState): Either[String, Type] = {
       val a = TyVar("init")
       val as = tp(exp, a).run(tcs)
-      as._1.right.map(s => renameTyVars(subs(a, s)))
+      as._2.right.map(s => renameTyVars(subs(a, s)))
     }
     for {
       e   <- Parser.parseExpr(exp)
@@ -279,7 +283,7 @@ object TypeChecker {
 
     //println(s)
     val r = s(TypeCheckState(valsAndTyVars.length, env, Map()))
-    val finalSubstE = r._1.last
+    val finalSubstE = r._2.last
 
     /* finally, rename all the type variables so that they look nice */
 

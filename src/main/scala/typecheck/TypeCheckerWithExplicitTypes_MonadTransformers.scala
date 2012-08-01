@@ -17,13 +17,13 @@ object TypeCheckerWithExplicitTypes_MonadTransformers {
   def compare(t1: Type, t2: Type, resultType: Type, errorMsg: String) =
     if (t1 == t2) success(resultType) else typeError(errorMsg)
 
-  type V[T] = Either[String, T]
+  type V[+T] = Either[String, T]
 
   // liftK essentially promotes an Either to a Kleisli.
   def liftK[T, U](e: Either[String, U]) = kleisli[V, T, U]((env: T) => e)
 
   // TODO: i should be able to import this from somewhere in scalaz
-  def local[F[_], A, R](f: (R) => R)(fa: Kleisli[F, R, A]): Kleisli[F, R, A] =
+  def local[F[+_], A, R](f: (R) => R)(fa: Kleisli[F, R, A]): Kleisli[F, R, A] =
     Kleisli[F, R, A](r => fa.run(f(r)))
 
   def typeCheck(expr: Exp): ReaderT[V, TypeEnv, Type] = expr match {
